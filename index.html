@@ -39,7 +39,7 @@
                     id="exampleDictionary" 
                     rows="10"
                     class="w-full p-4 text-sm text-gray-800 bg-gray-50 border border-gray-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-300 resize-none"
-                >シムズ4のゲームMOD用JSONの自然な日本語訳のために置換辞書を作成してください。
+                >シムズ4のゲームMOD用JSONの自然な日本語訳のためにPythonようの置換辞書を作成してください。Python辞書はJSON文字列化してください。
 {0.SimFirstName}、{1.SimFirstName}、{M0.彼}、{F0.彼女} などのタグは「必ず形を変えず・翻訳せず」残してください。もし小文字化や未翻訳、誤りがあれば必ず正しいタグ表記（大文字小文字含む）に直してください。
 タグ部分以外は自然な日本語になるよう、特に接続詞や言い回しを直してください。
 未翻訳の文章部分があれば日本語にしてください。
@@ -204,7 +204,7 @@
                             newObj[key] = processedValue;
                         }
                     } else {
-                        newObj[key] = deepReplace(value, replacementDict);
+                        newObj[key] = deep_replace(value, replacementDict);
                     }
                 }
             }
