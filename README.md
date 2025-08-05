@@ -3,6 +3,8 @@
 The Sims 4 の翻訳ファイル（JSON）を、AIと連携しながら自然な日本語に置き換えるための支援ツールです。  
 タグを壊さず、繰り返し使える置換辞書の作成と適用が簡単にできます。
 
+ツールはこちら🌐<a href="https://nonamesims4.github.io/Sims4JSON-AI-/" target="_blank" rel="noopener">別窓で開きます</a>
+
 
 
 ## 💡 使い方（ざっくり）
