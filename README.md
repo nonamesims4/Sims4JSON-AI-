@@ -30,7 +30,7 @@ The Sims 4 の翻訳ファイル（JSON）を、AIと連携しながら自然な
 - STBL形式のタグを維持したまま置換処理
 - AIと連携した柔軟な置換辞書の作成が可能
 - Webブラウザ上で動作、インストール不要
-- AIへの依頼文に<a href="https://github.com/nonamesims4/The-Sims-4-MOD-JSON-" target="_blank" rel="noopener">The-Sims-4-MOD-JSON</a>で出力される__PH_0__ や __PH_1__といったトークンを修正
+- AIへの依頼文に<a href="https://github.com/nonamesims4/The-Sims-4-MOD-JSON-" target="_blank" rel="noopener">The-Sims-4-MOD-JSON</a>で出力される__PH_0__ や __PH_1__といったトークンを修正させる文を追加
 
 
 
