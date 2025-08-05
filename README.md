@@ -35,14 +35,13 @@ The Sims 4 の翻訳ファイル（JSON）を、AIと連携しながら自然な
 
 
 
-## 🧠Special Thanks
+
 
 アイデアを出したらコードを提案・提供してくれたAI達：
 
 - [Perplexity](https://www.perplexity.ai/)
 - [ChatGPT](https://chatgpt.com/)
 - [Gemini](https://gemini.google.com/app)
-
-皆様のおかげで、このツールを完成させることができました。本当にありがとうございます！  
+ 
 そして――  
 このツールを見つけてくださった **あなた** に、最大級の感謝を。
