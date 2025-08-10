@@ -25,32 +25,22 @@
     </style>
 </head>
 <body class="p-4 sm:p-8 bg-gray-100 flex items-center justify-center min-h-screen">
-
     <div class="max-w-4xl w-full bg-white rounded-2xl shadow-xl p-6 sm:p-10 border-4 border-purple-500">
         <h1 class="text-3xl sm:text-4xl font-extrabold text-center mb-6 text-purple-700 leading-tight">Sims4JSONファイル専用<br>AI依頼文付きリトライツール✨</h1>
-        <p class="text-center text-gray-600 mb-4">辞書データを入力し、ファイルをアップロードして、翻訳されたテキストをプレビュー・ダウンロードしましょう！</p>
+        <p class="text-center text-gray-600 mb-4">Sims4Translatorにも対応しました！<br>辞書データを入力し、ファイルをアップロードして、翻訳されたテキストをプレビュー・ダウンロードしましょう！</p>
         
         <!-- コピペ用テキストエリアとボタンのコンテナ -->
         <div class="flex flex-col mb-6">
             <label for="exampleDictionary" class="block text-gray-700 font-bold mb-2">AIへの依頼文（コピー＆ペーストしてね！）</label>
             <p class="text-sm text-gray-600 mb-2">AIにJSONファイルを添付し、この依頼文を貼り付け送信（添付できない場合は依頼文後にJSONの内容を貼り付け）</p>
             <div class="flex items-center gap-2">
-                <textarea 
-                    id="exampleDictionary" 
+                <textarea
+                    id="exampleDictionary"
                     rows="10"
                     class="w-full p-4 text-sm text-gray-800 bg-gray-50 border border-gray-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-300 resize-none"
-                >シムズ4のゲームMOD用JSONの自然な日本語訳のためにPythonようの置換辞書を作成してください。Python辞書はJSON文字列化してください。
-{0.SimFirstName}、{1.SimFirstName}、{M0.彼}、{F0.彼女} などのタグは「必ず形を変えず・翻訳せず」残してください。もし小文字化や未翻訳、誤りがあれば必ず正しいタグ表記（大文字小文字含む）に直してください。
-タグ部分以外は自然な日本語になるよう、特に接続詞や言い回しを直してください。
-未翻訳の文章部分があれば日本語にしてください。
-文章のトーンは統一してください（例：「ですます」など）。
-辞書は「置換前の文章（タグ抜き）」をキー、「自然で正しい日本語」をバリューとしたJSON形式でください。
-例：
-「警察が{1.SimFirstName}を逮捕しに来ています。」 → 「警察が{1.SimFirstName}を逮捕に来ています。」
-「{M0.彼は}は」 → 「{M0.彼}は」
-さらに、__PH_0__は{0.SimFirstName}に、__PH_1__は{1.SimFirstName}に置換してください。</textarea>
-                <button 
-                    id="copyDictionaryButton" 
+                >シムズ4のゲームMOD用JSONの自然な日本語訳のためにPythonようの置換辞書を作成してください。Python辞書はJSON文字列化してください。{0.SimFirstName}、{1.SimFirstName}、{M0.彼}、{F0.彼女} などのタグは「必ず形を変えず・翻訳せず」残してください。もし小文字化や未翻訳、誤りがあれば必ず正しいタグ表記（大文字小文字含む）に直してください。タグ部分以外は自然な日本語になるよう、特に接続詞や言い回しを直してください。未翻訳の文章部分があれば日本語にしてください。文章のトーンは統一してください（例：「ですます」など）。辞書は「置換前の文章（タグ抜き）」をキー、「自然で正しい日本語」をバリューとしたJSON形式でください。例：「警察が{1.SimFirstName}を逮捕しに来ています。」 → 「警察が{1.SimFirstName}を逮捕に来ています。」「{M0.彼は}は」 → 「{M0.彼}は」さらに、__PH_0__は{0.SimFirstName}に、__PH_1__は{1.SimFirstName}に置換してください。</textarea>
+                <button
+                    id="copyDictionaryButton"
                     class="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg shadow-lg hover:bg-purple-700 transition duration-300 ease-in-out transform hover:scale-105 whitespace-nowrap"
                 >
                     コピー
@@ -58,18 +48,14 @@
             </div>
             <div id="copyStatusMessage" class="text-right text-sm text-green-600 font-medium mt-1 opacity-0 transition-opacity duration-300"></div>
         </div>
-
+        
         <!-- 辞書データの入力エリア -->
         <div class="mb-6">
             <label for="dictionaryInput" class="block text-gray-700 font-bold mb-2">辞書データ (JSON形式)ここにAIからの文章を例文の用に貼り付けてね！</label>
-            <textarea 
-                id="dictionaryInput" 
-                rows="5" 
-                placeholder="AIが生成した辞書データをJSON形式でここに貼り付けてください。例：
-{
-    &quot;置換前のテキスト1&quot;: &quot;置換後のテキスト1&quot;,
-    &quot;置換前のテキスト2&quot;: &quot;置換後のテキスト2&quot;
-}"
+            <textarea
+                id="dictionaryInput"
+                rows="5"
+                placeholder="AIが生成した辞書データをJSON形式でここに貼り付けてください。例：{    &quot;置換前のテキスト1&quot;: &quot;置換後のテキスト1&quot;,    &quot;置換前のテキスト2&quot;: &quot;置換後のテキスト2&quot;}"
                 class="w-full p-4 text-sm text-gray-800 bg-gray-50 border border-gray-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-300 resize-none"
             >{
 "お腹が空いた。何か食べたい。": "あら、お腹がペコペコよ〜！なんか美味しいものちょうだい！",
@@ -81,23 +67,23 @@
 "{F0.彼女}と{M0.彼}の友達は実は付き合ってるって噂": "ねぇ聞いて！{F0.彼女}と{M0.彼}の友達、実は付き合ってるらしいのよ！"
 }</textarea>
         </div>
-
+        
         <!-- ファイル選択とボタンのコンテナ -->
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
-            <input 
-                type="file" 
-                id="fileInput" 
+            <input
+                type="file"
+                id="fileInput"
                 class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 transition duration-300"
             >
-            <button 
-                id="convertButton" 
+            <button
+                id="convertButton"
                 class="w-full sm:w-auto px-6 py-3 bg-gray-400 text-white font-bold rounded-full shadow-lg cursor-not-allowed transition duration-300 ease-in-out transform hover:scale-105"
                 disabled
             >
                 変換する
             </button>
-            <button 
-                id="downloadButton" 
+            <button
+                id="downloadButton"
                 class="w-full sm:w-auto px-6 py-3 bg-gray-400 text-white font-bold rounded-full shadow-lg cursor-not-allowed transition duration-300 ease-in-out transform hover:scale-105"
                 disabled
             >
@@ -111,18 +97,18 @@
         <div class="grid md:grid-cols-2 gap-6">
             <div class="flex flex-col">
                 <label for="originalTextarea" class="block text-gray-700 font-bold mb-2">置換前（原文）</label>
-                <textarea 
-                    id="originalTextarea" 
-                    rows="15" 
+                <textarea
+                    id="originalTextarea"
+                    rows="15"
                     class="w-full p-4 text-sm text-gray-800 bg-gray-50 border border-gray-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-300 resize-none"
                     readonly
                 ></textarea>
             </div>
             <div class="flex flex-col">
                 <label for="previewTextarea" class="block text-gray-700 font-bold mb-2">置換後（プレビュー）</label>
-                <textarea 
-                    id="previewTextarea" 
-                    rows="15" 
+                <textarea
+                    id="previewTextarea"
+                    rows="15"
                     class="w-full p-4 text-sm text-gray-800 bg-gray-50 border border-gray-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-300 resize-none"
                     readonly
                 ></textarea>
@@ -136,7 +122,6 @@
             </a>
         </div>
     </div>
-
     <script>
         // DOM要素の取得
         const fileInput = document.getElementById('fileInput');
@@ -161,8 +146,8 @@
             // 例: {M0.His}, {m0.his} -> {M0.彼}
             // 例: {F0.Her}, {f0.her} -> {F0.彼女}
             return text
-                .replace(/\{[mM]0\.(his|His|HIM)\}/g, '{M0.彼}')
-                .replace(/\{[fF]0\.(her|Her|SHE)\}/g, '{F0.彼女}');
+                .replace(/\{[mM]0\.(his|His|HIM|he)\}/g, '{M0.彼}')
+                .replace(/\{[fF]0\.(her|Her|SHE|she)\}/g, '{F0.彼女}');
         }
 
         // タグを抜いて比較用文字列として抽出する関数
@@ -179,43 +164,52 @@
 
         // JSONオブジェクトを再帰的に走査して置換する関数
         function deepReplace(obj, replacementDict) {
-            if (typeof obj !== 'object' || obj === null) {
-                return obj;
-            }
-
-            if (Array.isArray(obj)) {
-                return obj.map(item => deepReplace(item, replacementDict));
-            }
-
-            const newObj = {};
-            for (const key in obj) {
-                if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                    const value = obj[key];
-                    if (typeof value === 'string') {
-                        let processedValue = replacePlaceholders(value);
-                        let replacementFound = false;
-
-                        // 置換前の文章からタグを抜いたものをキーとして、辞書を検索
+            // ① Sims4公式 Locale/Entries 形式
+            if (obj && typeof obj === 'object' && obj.Locale && Array.isArray(obj.Entries)) {
+                const newEntries = obj.Entries.map(entry => {
+                    if (entry && typeof entry.Value === 'string') {
+                        const processedValue = replacePlaceholders(normalizeTags(entry.Value));
                         const cleanedValue = extractReplaceTarget(processedValue);
+                        let replacedValue = processedValue;
                         for (const [dictKey, dictValue] of Object.entries(replacementDict)) {
-                            // 辞書キーも正規化して比較
                             if (cleanedValue === extractReplaceTarget(dictKey)) {
-                                // 辞書の値もnormalizeTagsを適用してから出力
-                                newObj[key] = normalizeTags(dictValue);
-                                replacementFound = true;
+                                replacedValue = normalizeTags(dictValue);
                                 break;
                             }
                         }
+                        return { ...entry, Value: replacedValue };
+                    }
+                    return entry;
+                });
+                return { ...obj, Entries: newEntries };
+            }
 
-                        if (!replacementFound) {
-                            newObj[key] = processedValue;
-                        }
-                    } else {
-                        newObj[key] = deep_replace(value, replacementDict);
+            // ② 通常の配列／オブジェクト
+            if (Array.isArray(obj)) {
+                return obj.map(item => deepReplace(item, replacementDict));
+            }
+            if (typeof obj === 'object' && obj !== null) {
+                const newObj = {};
+                for (const key in obj) {
+                    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                        newObj[key] = deepReplace(obj[key], replacementDict);
                     }
                 }
+                return newObj;
             }
-            return newObj;
+
+            // ③ 文字列置換
+            if (typeof obj === 'string') {
+                const processedValue = replacePlaceholders(normalizeTags(obj));
+                const cleanedValue = extractReplaceTarget(processedValue);
+                for (const [dictKey, dictValue] of Object.entries(replacementDict)) {
+                    if (cleanedValue === extractReplaceTarget(dictKey)) {
+                        return normalizeTags(dictValue);
+                    }
+                }
+                return processedValue;
+            }
+            return obj;
         }
 
         // ファイルまたは辞書が変更されたときに変換ボタンの状態を更新する
@@ -264,7 +258,7 @@
 
             originalFileName = file.name;
             const reader = new FileReader();
-
+            
             reader.onload = (e) => {
                 const text = e.target.result;
                 originalTextarea.value = text;
