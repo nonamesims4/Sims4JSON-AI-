@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>高度口調変換ツール（キャラクター口調対応版）</title>
+<style>
+  body { font-family: sans-serif; background: #f9fafb; padding: 20px; margin:0; }
+  .container { max-width: 1100px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 3px 12px rgba(0,0,0,0.12); }
+  h1 { margin-bottom: 10px; }
+  h3 { margin-top: 20px; }
+  .tone-group { margin: 10px 0; }
+  .tone-group label { margin-right: 15px; cursor: pointer; }
+  textarea { width: 100%; font-family: monospace; font-size: 14px; margin-top: 10px; white-space: pre-wrap; }
+  input[type="file"] { margin-top: 10px; }
+  button { margin-top: 12px; padding: 8px 16px; cursor: pointer; }
+  #customToneArea { width: 100%; height: 150px; font-family: monospace; font-size: 13px; margin-top: 8px; }
+  .custom-section { margin-top: 20px; padding: 10px; background: #eef2f6; border-radius: 6px; }
+  /* 横並びプレビュー */
+  #previewContainer {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+  }
+  #originalArea, #convertedArea {
+    flex: 1;
+    height: 320px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    background: #fff;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 14px;
+  }
+  #previewLabels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+  }
+  #previewLabels div {
+    width: 48%;
+    font-weight: bold;
+    font-size: 16px;
+  }
+  /* キャラクター口調プレビュー */
+  .tone-preview-box {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+  }
+  .tone-preview-box > div {
+    flex: 1;
+    border: 1px solid #eee;
+    padding: 15px;
+    border-radius: 8px;
+  }
+  .tone-preview-box h4 {
+    margin-top: 0;
+    color: #444;
+  }
+  .tone-preview-box p {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 6px;
+    min-height: 60px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>高度口調変換ツール（キャラクター口調対応版）</h1>
+  <p>翻訳済みJSONファイルをアップロードし、口調を選択して自然化・置換できます。キャラクター別口調変換も可能です。</p>
+  <div class="tone-group" id="defaultToneGroup">
+    <h3>説明文用口調を選択</h3>
+    <!-- ラジオボタン動的挿入 -->
+  </div>
+  <div class="tone-group" id="dialogueToneGroup">
+    <h3>会話文用口調を選択</h3>
+    <!-- ラジオボタン動的挿入 -->
+  </div>
+  <div class="character-tone-control" style="margin-top:20px; background:#f0f7ff; padding:15px; border-radius:8px;">
+    <h3>キャラクター口調設定</h3>
+    <div style="margin-bottom:15px;">
+      <label for="characterToneMode">キャラクター口調モード:</label>
+      <select id="characterToneMode">
+        <option value="off">オフ</option>
+        <option value="simple">シンプルモード（全テキスト）</option>
+        <option value="dialogue">会話文のみ適用</option>
+        <option value="keybased">キー別設定</option>
+      </select>
+    </div>
+    
+    <div id="tonePreview" style="display:none;">
+      <h4>口調プレビュー</h4>
+      <div class="tone-preview-box">
+        <div>
+          <h4>元のテキスト</h4>
+          <p id="originalPreviewText">「{1.SimFirstName}、今日のデート楽しかったです。また会えますか？」</p>
+        </div>
+        <div>
+          <h4>変換後</h4>
+          <p id="convertedPreviewText">「{1.SimFirstName}さん、今日のデート楽しかったです。また会えますか？」</p>
+        </div>
+      </div>
+      
+      <div style="margin-top:15px;">
+        <label for="characterToneType">口調タイプ:</label>
+        <select id="characterToneType">
+          <option value="default">標準</option>
+          <option value="tsundere">ツンデレ</option>
+          <option value="ojousama">お嬢様</option>
+          <option value="kansai">関西弁</option>
+          <option value="aniki">あにき風</option>
+          <option value="onee">おねえ言葉</option>
+        </select>
+        <button id="updatePreviewBtn" style="margin-left:10px;">プレビュー更新</button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="fileInput" accept=".json" />
+  <button id="convertBtn" disabled>口調変換を実行</button>
+  <button id="downloadBtn" disabled>変換結果をJSONでダウンロード</button>
+  <div id="previewLabels">
+    <div>元の文章プレビュー</div>
+    <div>変換後文章プレビュー</div>
+  </div>
+  <div id="previewContainer">
+    <pre id="originalArea"></pre>
+    <pre id="convertedArea"></pre>
+  </div>
+  <div class="custom-section">
+    <h3>カスタム口調の追加・編集（JSON配列形式）</h3>
+    <p>例）[{ "pattern": "です。", "replacement": "だよ〜。" }, ...]</p>
+    <textarea id="customToneArea" placeholder='[ { "pattern": "です。", "replacement": "だよ〜。" } ]'></textarea>
+    <button id="applyCustomToneBtn">カスタム口調を説明文・会話文両方に適用</button>
+    <p>※カスタム口調は現在選択中の口調に追加されます</p>
+  </div>
+</div>
+<script>
+/** 置換辞書（小文字も混在の英語タグを日本語固定タグに統一） */
+function getReplaceDict() {
+  return {
+    "{M0.he}": "{M0.彼}",
+    "{M0.He}": "{M0.彼}",
+    "{M0.his}": "{M0.彼}",
+    "{M0.His}": "{M0.彼}",
+    "{M0.he's}": "{M0.彼}",
+    "{M0.He's}": "{M0.彼}",
+    "{F0.she}": "{F0.彼女}",
+    "{F0.She}": "{F0.彼女}",
+    "{F0.her}": "{F0.彼女}",
+    "{F0.Her}": "{F0.彼女}",
+    "{F0.she's}": "{F0.彼女}",
+    "{F0.She's}": "{F0.彼女}",
+    "{M1.he}": "{M1.彼}",
+    "{M1.He}": "{M1.彼}",
+    "{M1.his}": "{M1.彼}",
+    "{M1.His}": "{M1.彼}",
+    "{F1.she}": "{F1.彼女}",
+    "{F1.She}": "{F1.彼女}",
+    "{F1.her}": "{F1.彼女}",
+    "{F1.Her}": "{F1.彼女}",
+    "{0.simfirstname}": "{0.SimFirstName}",
+    "{1.simfirstname}": "{1.SimFirstName}",
+    "{0.simpronounsubjective}": "{M0.彼}{F0.彼女}",
+    "{0.simpronounpossessivedependent}": "{M0.彼}{F0.彼女}",
+    "{0.simpronounreflexive}": "{M0.彼}{F0.彼女}",
+    "{0.simpronounobjective}": "{M0.彼}{F0.彼女}",
+    "{F0.彼女}{F0.彼女}": "{F0.彼女}",
+    "{M0.彼}{M0.彼}": "{M0.彼}"
+  };
+}
+/** toneRules 基本セット（一部抜粋） */
+const baseToneRules = {
+  "tensei-chan-natural": [
+    { pattern: "(\\d+本パック)（\\d+）", replacement: "$1" },
+    { pattern: "（\\d+）", replacement: "" },
+    { pattern: "(\\d+)本パック", replacement: "$1本入りパック" },
+    { pattern: "すごい", replacement: "とても優れている" },
+    { pattern: "面白い", replacement: "興味深い" },
+    { pattern: "わかる", replacement: "理解できます" }
+  ],
+  "claude-style": [
+    { pattern: "することができます", replacement: "できます" },
+    { pattern: "〜に関しては", replacement: "〜については" },
+    { pattern: "とても", replacement: "非常に" },
+    { pattern: "すごく", replacement: "とても" },
+    { pattern: "面白い", replacement: "興味深い" },
+    { pattern: "変な", replacement: "不思議な" },
+    { pattern: "(\\d+本パック)（\\d+）", replacement: "$1" }
+  ],
+  "claude-natural": [
+    { pattern: "たたいて退治した", replacement: "叩いて退治しました" },
+    { pattern: "怖いので", replacement: "怖かったので" },
+    { pattern: "クモがうで", replacement: "腕にクモが" }
+  ],
+  "claude-cute": [
+    { pattern: "です。", replacement: "だよ。" },
+    { pattern: "ます。", replacement: "だよ。" },
+    { pattern: "ありがとう", replacement: "ありがとね♡" }
+  ],
+  "tsundere": [
+    { pattern: "です。", replacement: "なんだからね！" },
+    { pattern: "ます。", replacement: "するんだからね！" }
+  ],
+  "aniki": [
+    { pattern: "です。", replacement: "だぜ。" },
+    { pattern: "ます。", replacement: "するぜ。" }
+  ],
+  "okama": [
+    { pattern: "です。", replacement: "ですわよ～。" },
+    { pattern: "ます。", replacement: "ますのよ～。" }
+  ],
+  "onee": [
+    { pattern: "です。", replacement: "ですわ。" },
+    { pattern: "ます。", replacement: "ますわ。" }
+  ],
+  "casual": [
+    { pattern: "です。", replacement: "だよ。" },
+    { pattern: "ます。", replacement: "だよ。" },
+    { pattern: "だね。", replacement: "だよね。" },
+    { pattern: "ね。", replacement: "だよね。" }
+  ],
+  "aipi_sims4_narration": [
+    { pattern: "です。", replacement: "です。<b>どうぞよろしくね</b>" },
+    { pattern: "ます。", replacement: "ます。<b>がんばるよ〜</b>" },
+    { pattern: "ありがとう", replacement: "ありがとう" },
+    { pattern: "よろしく", replacement: "よろしくね" },
+    { pattern: "こんにちは", replacement: "こんにちは！" },
+    { pattern: "さようなら", replacement: "さようなら！" },
+    { pattern: "すごい", replacement: "すごいね" },
+    { pattern: "面白い", replacement: "面白いよ" },
+    { pattern: "わかる", replacement: "わかるよ" }
+  ],
+  "aipi_sims4_dialogue": [
+    { pattern: "です。", replacement: "だよ。<b>よろしくね</b>" },
+    { pattern: "ます。", replacement: "するよ〜。<b>ちゃんと見ててね</b>" },
+    { pattern: "ありがとう", replacement: "ありがとね" },
+    { pattern: "よろしく", replacement: "よろしくだよ" },
+    { pattern: "こんにちは", replacement: "やっほ〜！" },
+    { pattern: "さようなら", replacement: "またね〜" },
+    { pattern: "すごい", replacement: "超すごい〜" },
+    { pattern: "面白い", replacement: "超おもしろい〜" },
+    { pattern: "わかる", replacement: "わかったよ" }
+  ]
+};
+// プレースホルダーのマスク・アンマスク関数
+function maskPlaceholders(text) {
+  const found = text.match(/\_\_PH\_[0-9]+\_\_/gi) || [];
+  let mapping = {};
+  let masked = text;
+  found.forEach((ph, i) => {
+    const token = `__PLACEHOLDER_${i}__`;
+    masked = masked.replace(new RegExp(ph.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), token);
+    mapping[token] = ph;
+  });
+  return { masked, mapping };
+}
+function unmaskPlaceholders(text, mapping) {
+  let restored = text;
+  for (const token in mapping) {
+    const ph = mapping[token];
+    const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedToken, 'g');
+    restored = restored.replace(regex, ph);
+  }
+  return restored;
+}
+// 共通修正ルール
+const commonFixes = [
+  { pattern: "{M0.彼は}は", replacement: "{M0.彼}は" },
+  { pattern: "{F0.彼女は}は", replacement: "{F0.彼女}は" }
+];
+// 文体判定
+function detectTextType(text) {
+  if (/[！？!?」"]$/.test(text.trim()) || /(だよ|だね|しよう|かな)/.test(text)) return "dialogue";
+  return "narration";
+}
+let loadedData = null;
+// UI 口調選択ラジオを生成
+const toneDisplayNames = {
+  "tensei-chan-natural": "天才ちゃん風（説明文）",
+  "claude-style": "クール（説明文）",
+  "claude-natural": "ナチュラル（説明文）",
+  "claude-cute": "かわいい（説明文）",
+  "tsundere": "ツンデレ（説明文）",
+  "aniki": "あにき風（説明文）",
+  "okama": "おかま風（説明文）",
+  "onee": "おねえ言葉（説明文）",
+  "casual": "カジュアル（説明文）",
+  "aipi_sims4_narration": "あいぴ口調（説明文 / Sims4対応）",
+  "tensei-chan-dialogue": "天才ちゃん風（会話文）",
+  "claude-style-dialogue": "クール（会話文）",
+  "claude-natural-dialogue": "ナチュラル（会話文）",
+  "claude-cute-dialogue": "かわいい（会話文）",
+  "tsundere-dialogue": "ツンデレ（会話文）",
+  "aniki-dialogue": "あにき風（会話文）",
+  "okama-dialogue": "おかま風（会話文）",
+  "onee-dialogue": "おねえ言葉（会話文）",
+  "casual-dialogue": "カジュアル（会話文）",
+  "aipi_sims4_dialogue": "あいぴ口調（会話文 / Sims4対応）"
+};
+function createToneRadios(containerId, name, defaultValue) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  Object.entries(toneDisplayNames).forEach(([key, label]) => {
+    if (!key.endsWith("-dialogue") && name === "dialogueTone") return;
+    if (key.endsWith("-dialogue") && name === "defaultTone") return;
+    const radioId = `${name}_${key}`;
+    const labelElem = document.createElement("label");
+    labelElem.htmlFor = radioId;
+    labelElem.style.cursor = "pointer";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = name;
+    radio.id = radioId;
+    radio.value = key.replace("-dialogue", "");
+    if (radio.value === defaultValue) radio.checked = true;
+    labelElem.appendChild(radio);
+    labelElem.appendChild(document.createTextNode(label));
+    container.appendChild(labelElem);
+  });
+}
+window.onload = () => {
+  createToneRadios("defaultToneGroup", "defaultTone", "claude-natural");
+  createToneRadios("dialogueToneGroup", "dialogueTone", "tsundere");
+  document.getElementById('characterToneMode').addEventListener('change', function() {
+    document.getElementById('tonePreview').style.display = this.value !== 'off' ? 'block' : 'none';
+    updateTonePreview();
+  });
+  document.getElementById('characterToneType').addEventListener('change', updateTonePreview);
+  document.getElementById('updatePreviewBtn').addEventListener('click', updateTonePreview);
+  document.getElementById('tonePreview').style.display = 'none';
+};
+// === キャラクター口調システム =======
+const characterTones = {
+  default: {
+    endings: ["です。", "ます。"],
+    secondPerson: "{1.SimFirstName}さん"
+  },
+  tsundere: {
+    endings: ["よ！", "るの！", "んだから！"],
+    secondPerson: "アンタ",
+    patterns: [
+      { pattern: "ありがとう", replacement: "ありがと...別に嬉しくなんかないんだから！" }
+    ]
+  },
+  ojousama: {
+    endings: ["ですわ。", "ますわ。", "でございますわ。"],
+    secondPerson: "{1.SimFirstName}様",
+    patterns: [
+      { pattern: "です", replacement: "でございます" }
+    ]
+  },
+  kansai: {
+    endings: ["で。", "るで。", "ねん。"],
+    secondPerson: "あんた",
+    patterns: [
+      { pattern: "です", replacement: "や" },
+      { pattern: "ます", replacement: "まんねん" }
+    ]
+  },
+  aniki: {
+    endings: ["ぜ。", "るぜ。", "んだ。"],
+    secondPerson: "お前",
+    patterns: [
+      { pattern: "です", replacement: "だ" },
+      { pattern: "ます", replacement: "る" }
+    ]
+  },
+  onee: {
+    endings: ["ですわ〜", "ますわ〜", "ですの〜"],
+    secondPerson: "あなた",
+    patterns: [
+      { pattern: "です", replacement: "ですわ" },
+      { pattern: "ます", replacement: "ますわ" }
+    ]
+  }
+};
+// 口調適用関数（語尾と二人称中心）
+function applyCharacterTone(text, characterType = 'default') {
+  const tone = characterTones[characterType] || characterTones.default;
+  let converted = text;
+  // 二人称変換
+  if (tone.secondPerson) {
+    converted = converted.replace(/\{1\.SimFirstName\}/g, tone.secondPerson);
+  }
+  // 語尾変換（ランダムでバリエーションを出す）
+  if (tone.endings) {
+    const baseEndings = ["です。", "ます。"];
+    baseEndings.forEach(baseEnding => {
+      if (converted.includes(baseEnding)) {
+        const randIndex = Math.floor(Math.random() * tone.endings.length);
+        converted = converted.replace(baseEnding, tone.endings[randIndex]);
+      }
+    });
+  }
+  // 追加パターン適用
+  if (tone.patterns) {
+    tone.patterns.forEach(rule => {
+      converted = converted.replace(new RegExp(rule.pattern, 'g'), rule.replacement);
+    });
+  }
+  return converted;
+}
+// キー別口調マッピング（会話文中心）
+const dialogueToneMapping = {
+  // 会話文のキーを指定
+  "0x56E0B72E": "tsundere",   // ファンタジーについて話す
+  "0x6D2BEDC2": "ojousama",   // 気軽な恋愛
+  "0x37A81EDC": "aniki",      // ベッドに誘う
+  "0x99CC6DEF": "kansai"      // パンティ交換を申し込む
+};
+// キャラクター口調プレビュー更新
+function updateTonePreview() {
+  const sampleText = "「{1.SimFirstName}、今日のデート楽しかったです。また会えますか？」";
+  const toneType = document.getElementById('characterToneType').value;
+  const converted = applyCharacterTone(sampleText, toneType);
+  document.getElementById('originalPreviewText').textContent = sampleText;
+  document.getElementById('convertedPreviewText').textContent = converted;
+}
+// === メイン処理 =======
+// 元テキストプレビュー表示更新
+function updateOriginalPreview(entries) {
+  if (!entries) return;
+  let texts = [];
+  entries.forEach(entry => {
+    if (!entry.Value && !entry.value) return;
+    texts.push(entry.Value || entry.value);
+  });
+  document.getElementById("originalArea").textContent = texts.join("\n\n");
+}
+// 変換後テキストプレビュー表示更新
+function updateConvertedPreview(entries) {
+  if (!entries) return;
+  let texts = [];
+  entries.forEach(entry => {
+    if (!entry.Value && !entry.value) return;
+    texts.push(entry.Value || entry.value);
+  });
+  document.getElementById("convertedArea").textContent = texts.join("\n\n");
+}
+document.getElementById("fileInput").addEventListener("change", (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      loadedData = JSON.parse(e.target.result);
+      updateOriginalPreview(loadedData.Entries || loadedData);
+      updateConvertedPreview([]); // リセット
+      document.getElementById("convertBtn").disabled = false;
+      document.getElementById("downloadBtn").disabled = true;
+    } catch {
+      alert("JSONファイルの読み込みに失敗しました。");
+    }
+  };
+  reader.readAsText(file);
+});
+document.getElementById("convertBtn").addEventListener("click", () => {
+  if (!loadedData) return;
+  const defTone = document.querySelector('input[name="defaultTone"]:checked').value;
+  const diaTone = document.querySelector('input[name="dialogueTone"]:checked').value;
+  const charToneMode = document.getElementById("characterToneMode").value;
+  const replaceDict = getReplaceDict();
+  const entries = loadedData.Entries || loadedData;
+  entries.forEach(entry => {
+    let val = entry.Value || entry.value || "";
+    if (!val.trim()) return;
+    // 1. 小文字→大文字正規化＋置換辞書適用
+    const valUpper = val.toUpperCase();
+    let replacedVal = valUpper;
+    for (const key in replaceDict) {
+      const pattern = key.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(pattern, "g");
+      replacedVal = replacedVal.replace(regex, replaceDict[key]);
+    }
+    // 2. プレースホルダーマスク（__PH_0__など）
+    const { masked, mapping } = maskPlaceholders(replacedVal);
+    // 3. 文体判定
+    const type = detectTextType(val);
+    const toneKey = type === "dialogue" ? diaTone : defTone;
+    // 4. 共通修正
+    let processed = masked;
+    commonFixes.forEach(fix => {
+      const reg = new RegExp(fix.pattern, "g");
+      processed = processed.replace(reg, fix.replacement);
+    });
+    // 5. toneRules適用
+    (baseToneRules[toneKey] || []).forEach(rule => {
+      const reg = new RegExp(rule.pattern, "g");
+      processed = processed.replace(reg, rule.replacement);
+    });
+    // 6. プレースホルダー復元
+    entry.Value = unmaskPlaceholders(processed, mapping);
+    
+    // 7. キャラクター口調適用
+    if (charToneMode !== "off") {
+      // 会話文のみモードでかつ会話文の場合
+      if (charToneMode === "dialogue" && type === "dialogue") {
+        const charType = document.getElementById("characterToneType").value;
+        entry.Value = applyCharacterTone(entry.Value, charType);
+      }
+      // キーベースモードの場合
+      else if (charToneMode === "keybased" && dialogueToneMapping[entry.Key]) {
+        entry.Value = applyCharacterTone(entry.Value, dialogueToneMapping[entry.Key]);
+      }
+      // シンプルモード（全テキスト適用）
+      else if (charToneMode === "simple") {
+        const charType = document.getElementById("characterToneType").value;
+        entry.Value = applyCharacterTone(entry.Value, charType);
+      }
+    }
+  });
+  updateConvertedPreview(entries);
+  document.getElementById("resultArea").value = JSON.stringify(loadedData, null, 2);
+  document.getElementById("downloadBtn").disabled = false;
+});
+// ダウンロードボタン
+document.getElementById("downloadBtn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(loadedData, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "converted_tone.json";
+  a.click();
+});
+// カスタム口調の適用
+document.getElementById("applyCustomToneBtn").addEventListener("click", () => {
+  let customText = document.getElementById("customToneArea").value.trim();
+  if (!customText) {
+    alert("カスタム口調のJSONを入力してください。");
+    return;
+  }
+  let customRules;
+  try {
+    customRules = JSON.parse(customText);
+    if (!Array.isArray(customRules)) throw new Error();
+  } catch {
+    alert("カスタム口調はJSON配列で正しく入力してください。例：[{\"pattern\":\"です。\",\"replacement\":\"だよ〜。\"}]");
+    return;
+  }
+  const defTone = document.querySelector('input[name="defaultTone"]:checked').value;
+  const diaTone = document.querySelector('input[name="dialogueTone"]:checked').value;
+  baseToneRules[defTone] = (baseToneRules[defTone] || []).concat(customRules);
+  baseToneRules[diaTone] = (baseToneRules[diaTone] || []).concat(customRules);
+  alert("カスタム口調を選択中の説明文・会話文口調に追加適用しました。");
+});
+</script>
+</body>
+</html>
