@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>The Sims 4 MOD JSON一括日本語化・リライトツール</title>
+<style>
+body {
+    font-family: "Segoe UI", sans-serif;
+    background: #f9f9f9;
+    padding: 20px;
+}
+h1 {
+    color: #444;
+}
+textarea {
+    width: 100%;
+    height: 200px;
+    font-family: monospace;
+    font-size: 14px;
+}
+button {
+    margin-top: 10px;
+    padding: 10px 15px;
+    font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<h1>The Sims 4 MOD JSON一括日本語化・リライトツール</h1>
+<p>JSONファイルをアップロードして翻訳/リライトします。<br>
+GeminiやColabでの動作テスト時はこのまま利用可能。</p>
+
+<input type="file" id="fileInput" accept=".json"><br>
+<label>
+    <input type="radio" name="mode" value="translate"> 英語のみ翻訳
+</label>
+<label>
+    <input type="radio" name="mode" value="rewrite" checked> 日本語も再翻訳
+</label>
+<br><br>
+<button id="processBtn">処理開始</button>
+
+<h3>出力</h3>
+<textarea id="output" readonly></textarea>
+<br>
+<a id="downloadLink" style="display:none;">翻訳結果をダウンロード</a>
+
+<script>
+function containsJapanese(text) {
+    return /[\u3040-\u30ff\u4e00-\u9fff]/.test(text);
+}
+
+function cleanAsterisks(text) {
+    return text.replace(/^\s*\*+\s*|\s*\*+\s*$/g, '');
+}
+
+function normalizeTags(text) {
+    text = text.replace(/\{([^}]+)\}/g, (_, inner) => `{${inner.toUpperCase()}}`);
+    const replacements = [
+        [/\{M0\.(HE|HIS)\b/gi, '{M0.彼}'],
+        [/\{F0\.(SHE|HER)\b/gi, '{F0.彼女}'],
+        [/\{M1\.(HE|HIS)\b/gi, '{M1.彼}'],
+        [/\{F1\.(SHE|HER)\b/gi, '{F1.彼女}'],
+        [/\{0\.SIMFIRSTNAME\}/gi, '{0.SimFirstName}'],
+        [/\{1\.SIMFIRSTNAME\}/gi, '{1.SimFirstName}'],
+        [/\{0\.SIMPRONOUN\w+\}/gi, '{M0.彼}{F0.彼女}'],
+        [/(\{F0\.彼女\})の/g, '$1'],
+        [/(\{M0\.彼\})の/g, '$1'],
+        [/(\{[FM]0\.彼女?\})[がはを]/g, '$1'],
+        [/(\{[FM]\d\.[^}]+\})\1+/g, '$1']
+    ];
+    replacements.forEach(([pattern, repl]) => {
+        text = text.replace(pattern, repl);
+    });
+    return text;
+}
+
+function maskPlaceholders(text) {
+    const pattern = /\{[\w\s\.\'\-\:\(\)]+\}/g;
+    const found = text.match(pattern) || [];
+    let masked = text;
+    const map = {};
+    found.forEach((ph, i) => {
+        const token = `__PLACEHOLDER_${i}__`;
+        masked = masked.replace(ph, token);
+        map[token] = ph;
+    });
+    return [masked, map];
+}
+
+function unmaskPlaceholders(text, map) {
+    Object.entries(map).forEach(([token, ph]) => {
+        const flexible = new RegExp(token.replace(/_/g, "\\s*_?\\s*"), "gi");
+        text = text.replace(flexible, ph);
+    });
+    return text;
+}
+
+// 疑似翻訳関数（Gemini APIと差し替え予定）
+async function pseudoTranslateBatch(texts, mode) {
+    return texts.map(t => mode === "translate" ? t + "【翻訳】" : t + "【リライト】");
+}
+
+document.getElementById('processBtn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('fileInput');
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    if (!fileInput.files.length) {
+        alert("JSONファイルを選択してください");
+        return;
+    }
+    const file = fileInput.files[0];
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    const toTranslate = [];
+    const indices = [];
+
+    data.Entries.forEach((entry, idx) => {
+        let val = entry.value || "";
+        val = normalizeTags(val);
+        val = cleanAsterisks(val);
+        const isJP = containsJapanese(val);
+        const shouldTranslate = (mode === "translate" && !isJP) || mode === "rewrite";
+        if (shouldTranslate) {
+            const [masked, phMap] = maskPlaceholders(val);
+            toTranslate.push(masked);
+            indices.push([idx, phMap]);
+        } else {
+            entry.value = val;
+        }
+    });
+
+    if (toTranslate.length > 0) {
+        const translated = await pseudoTranslateBatch(toTranslate, mode);
+        translated.forEach((txt, i) => {
+            const [idx, phMap] = indices[i];
+            const restored = unmaskPlaceholders(txt, phMap);
+            data.Entries[idx].value = cleanAsterisks(restored);
+        });
+    }
+
+    const outputEl = document.getElementById('output');
+    outputEl.value = JSON.stringify(data, null, 2);
+
+    const blob = new Blob([outputEl.value], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const link = document.getElementById('downloadLink');
+    link.href = url;
+    link.download = "translated_output.json";
+    link.textContent = "翻訳結果をダウンロード";
+    link.style.display = "inline-block";
+});
+</script>
+
+</body>
+</html>
