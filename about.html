@@ -1,136 +1,104 @@
-# 必要なライブラリ
-!pip install deep-translator tqdm --quiet
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Sims4 JSON リライトツール（シムっぽい）</title>
+<style>
+body { font-family: sans-serif; margin: 20px; background:#f5f5f5; }
+h1 { color: #444; }
+textarea { width:100%; height:200px; }
+button { padding:10px 20px; margin:5px; cursor:pointer; }
+#output { white-space: pre-wrap; background:#fff; padding:10px; border:1px solid #ccc; margin-top:10px; }
+</style>
+</head>
+<body>
+<h1>Sims4 JSON リライトツール（シム風サンプル付き）</h1>
+<input type="file" id="fileInput"><br>
+<button id="processBtn">リライト整形</button>
+<button id="downloadBtn">JSONダウンロード</button>
+<div id="output"></div>
 
-from google.colab import files
-import json
-import re
-from deep_translator import GoogleTranslator
-import time
-from tqdm import tqdm
-from IPython.display import FileLink, display
-
-# 設定
-TRANSLATION_MODE = "rewrite"  # "translate": 英語のみ翻訳, "rewrite": 日本語も再翻訳
-BATCH_SIZE = 30
-MAX_RETRIES = 5
-SLEEP_TIME = 0.5
-
-# ファイルアップロード
-uploaded = files.upload()
-input_path = next(iter(uploaded))
-
-# プレースホルダー処理
-def mask_placeholders(text):
-    pattern = r'\{[\w\s\.\'\-\:\(\)]+\}'
-    found = re.findall(pattern, text)
-    masked = text
-    placeholder_map = {}
-    for i, ph in enumerate(found):
-        token = f'__PLACEHOLDER_{i}__'
-        masked = masked.replace(ph, token)
-        placeholder_map[token] = ph
-    return masked, placeholder_map
-
-def unmask_placeholders(text, placeholder_map):
-    for token, ph in placeholder_map.items():
-        flexible_token = token.replace('_', r'\s*_?\s*')
-        text = re.sub(flexible_token, ph, text, flags=re.IGNORECASE)
-    return text
-
-# タグ正規化
-TAG_REPLACEMENTS = {
-    r'\{M0\.(HE|HIS)\b': '{M0.彼}',
-    r'\{F0\.(SHE|HER)\b': '{F0.彼女}',
-    r'\{M1\.(HE|HIS)\b': '{M1.彼}',
-    r'\{F1\.(SHE|HER)\b': '{F1.彼女}',
-    r'\{0\.SIMFIRSTNAME\}': '{0.SimFirstName}',
-    r'\{1\.SIMFIRSTNAME\}': '{1.SimFirstName}',
-    r'\{0\.SIMPRONOUN\w+\}': '{M0.彼}{F0.彼女}',
-    r'(\{F0\.彼女\})の': r'\1',
-    r'(\{M0\.彼\})の': r'\1',
-    r'(\{[FM]0\.彼女?\})[がはを]': r'\1',
-    r'(\{[FM]\d\.[^}]+\})\1+': r'\1',
+<script>
+// タグ正規化
+function normalizeTags(text) {
+    let TAG_REPLACEMENTS = [
+        [/\{M0\.(HE|HIS)\b/gi, '{M0.彼}'],
+        [/\{F0\.(SHE|HER)\b/gi, '{F0.彼女}'],
+        [/\{M1\.(HE|HIS)\b/gi, '{M1.彼}'],
+        [/\{F1\.(SHE|HER)\b/gi, '{F1.彼女}'],
+        [/\{0\.SIMFIRSTNAME\}/gi, '{0.SimFirstName}'],
+        [/\{1\.SIMFIRSTNAME\}/gi, '{1.SimFirstName}'],
+        [/\{0\.SIMPRONOUN\w+\}/gi, '{M0.彼}{F0.彼女}'],
+        [/\{F0\.彼女\}の/gi, '{F0.彼女}'],
+        [/\{M0\.彼\}の/gi, '{M0.彼}'],
+        [/\{[FM]0\.彼女?\}[がはを]/gi, match=>match.slice(0,-1)],
+        [/\{[FM]\d\.[^}]+\}\1+/gi, match=>match[0]],
+    ];
+    TAG_REPLACEMENTS.forEach(([pattern,repl])=>{
+        text = text.replace(pattern,repl);
+    });
+    // タグ大文字化
+    text = text.replace(/\{([^}]+)\}/g, m => '{' + m.slice(1,-1).toUpperCase() + '}');
+    return text;
 }
 
-def normalize_tags(text):
-    text = re.sub(r'\{([^}]+)\}', lambda m: '{' + m.group(1).upper() + '}', text)
-    for pattern, replacement in TAG_REPLACEMENTS.items():
-        text = re.sub(pattern, replacement, flags=re.IGNORECASE)
+// シムっぽい文章リライト例
+function rewriteSimStyle(text){
+    // ここで文章のニュアンスを少し柔らかくする例
     return text
+        .replace(/フェアリー/g, '小さな妖精')
+        .replace(/魔力/g, '魔法のエネルギー')
+        .replace(/翼を使って空を飛べます/g, 'ふわりと空を舞います')
+        .replace(/特別な力を持つ/g, '不思議な力を秘めた')
+        .replace(/魔法エネルギーを回復します/g, '魔法の力をゆっくり取り戻します');
+}
 
-# 日本語判定
-def contains_japanese(text):
-    return bool(re.search(r'[\u3040-\u30ff\u4e00-\u9fff]', text))
+// アスタリスク除去
+function cleanAsterisks(text){
+    return text.replace(/^\s*\*+\s*|\s*\*+\s*$/g,'');
+}
 
-# アスタリスク除去
-def clean_asterisks(text):
-    return re.sub(r'^\s*\*+\s*|\s*\*+\s*$', '', text)
+let jsonData = null;
 
-# バッチ翻訳
-def batch_translate(texts, source='en', target='ja'):
-    results = []
-    translator = GoogleTranslator(source=source, target=target)
-    for i in range(0, len(texts), BATCH_SIZE):
-        batch = texts[i:i+BATCH_SIZE]
-        success = False
-        retries = 0
-        while not success and retries < MAX_RETRIES:
-            try:
-                translated_batch = translator.translate_batch(batch)
-                results.extend(translated_batch)
-                success = True
-            except Exception as e:
-                retries += 1
-                print(f"バッチ翻訳エラー (リトライ {retries}/{MAX_RETRIES}): {str(e)}")
-                time.sleep(2 ** retries)
-            if not success:
-                print(f"翻訳失敗: {batch[0][:50]}...")
-                results.extend(batch)
-        time.sleep(SLEEP_TIME)
-    return results
+document.getElementById('fileInput').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = function(evt){
+        try {
+            jsonData = JSON.parse(evt.target.result);
+            document.getElementById('output').textContent = JSON.stringify(jsonData,null,2);
+        } catch(err){
+            alert('JSON解析エラー');
+        }
+    }
+    reader.readAsText(file,'utf-8');
+});
 
-# JSON読み込み
-print('JSONファイル処理中...')
-with open(input_path, encoding='utf-8') as f:
-    data = json.load(f)
+document.getElementById('processBtn').addEventListener('click', function(){
+    if(!jsonData){ alert('JSONを読み込んでください'); return; }
+    jsonData.Entries.forEach(entry=>{
+        if(entry.Value){
+            let text = normalizeTags(entry.Value);
+            text = cleanAsterisks(text);
+            text = rewriteSimStyle(text);
+            entry.Value = text; // リライト整形
+        }
+    });
+    document.getElementById('output').textContent = JSON.stringify(jsonData,null,2);
+});
 
-# 翻訳対象を収集
-to_translate = []
-indices = []
-for idx, entry in enumerate(data['Entries']):
-    val = entry.get('Value', '')   # ← ここを大文字Valueに
-    if not val:
-        continue
-    normalized_val = normalize_tags(val)
-    cleaned_val = clean_asterisks(normalized_val)
-    is_jp = contains_japanese(cleaned_val)
-    should_translate = (
-        (TRANSLATION_MODE == "translate" and not is_jp) or
-        (TRANSLATION_MODE == "rewrite")
-    )
-    if should_translate:
-        masked, ph_map = mask_placeholders(cleaned_val)
-        to_translate.append(masked)
-        indices.append((idx, ph_map))
-    else:
-        entry['Value'] = cleaned_val   # ← ここも大文字Valueに修正
-
-# 翻訳実行
-if to_translate:
-    print(f"翻訳処理開始: {len(to_translate)}件 ({TRANSLATION_MODE}モード)")
-    translated_texts = batch_translate(to_translate)
-    for (idx, ph_map), translated in zip(indices, translated_texts):
-        restored = unmask_placeholders(translated, ph_map)
-        data['Entries'][idx]['Value'] = clean_asterisks(restored)  # ← 修正済み
-
-# 保存
-output_path = "translated_output.json"
-with open(output_path, 'w', encoding='utf-8') as f:
-    json.dump(data, f, ensure_ascii=False, indent=2)
-
-print(f'処理完了！出力ファイル: {output_path}')
-try:
-    files.download(output_path)
-except:
-    print("自動ダウンロード失敗。リンクからダウンロードしてください:")
-    display(FileLink(output_path))
+document.getElementById('downloadBtn').addEventListener('click', function(){
+    if(!jsonData){ alert('JSONを処理してください'); return; }
+    const blob = new Blob([JSON.stringify(jsonData,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'relit_sims4.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
