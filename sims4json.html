@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>🌸JSONからValueだけ抜いて置き換え辞書用分割できるよツール✨</title>
+<title>🌸 JSONからValueだけ抜いて置き換え辞書用分割できるよツール ✨</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:sans-serif; background:linear-gradient(135deg,#667eea,#764ba2); min-height:100vh; color:#333; }
@@ -28,8 +28,8 @@
 <body>
 <div class="container">
   <div class="header">
-    <h1>🌸JSONからValueだけ抜いて置き換え辞書用分割できるよツール✨</h1>
-    <p>翻訳用のValue抽出やJSON分割リライト簡易翻訳可能</p>
+    <h1>🌸 JSONからValueだけ抜いて置き換え辞書用分割できるよツール ✨</h1>
+    <p>翻訳用Valueの抽出やJSONの分割を簡単にできます。nonemesims4作翻訳辞書を使った自動リライト簡易翻訳機能です。</p>
   </div>
 
   <div class="card">
@@ -45,7 +45,7 @@
       <div class="setting-group">
         <label for="maxLines">1ファイルの最大行数 📏</label>
         <input type="number" id="maxLines" value="1000" min="100" max="5000" />
-        <small>1ファイルあたりの最大行数です。デフォルトは1000行です。</small>
+        <small>1ファイルあたりの最大行数です。デフォルトは1000行、作業しやすいサイズです。</small>
       </div>
       <div class="setting-group">
         <label for="splitMode">分割モード ✂️</label>
@@ -56,7 +56,7 @@
           <option value="line">行数指定</option>
           <option value="valueExtract">Valueキー抽出（テキスト化）</option>
         </select>
-        <small>シムズMODの場合は「スマート分割」がおすすめです。</small>
+        <small>Sims4MODなら「スマート分割」がおすすめです。</small>
       </div>
       <div class="setting-group">
         <label for="naming">ファイル名形式 🏷️</label>
@@ -69,8 +69,8 @@
       </div>
       <div class="setting-group">
         <label>🌸 自動翻訳リライト 🎌</label>
-        <input type="checkbox" id="autoTranslate"> 分割と同時にシムズ4用日本語翻訳も実行します
-        <small>翻訳辞書を使った自動リライト機能です。</small>
+        <input type="checkbox" id="autoTranslate"> 分割と同時に日本語翻訳も実行します
+        <small>nonemesims4作翻訳辞書を使った自動リライト簡易翻訳機能です。</small>
       </div>
     </div>
   </div>
@@ -87,12 +87,16 @@
     <p id="aiHint" style="display:none;">これは簡易ツールなので、下のテキストをAIに投げてから編集すると楽です。</p>
     <div id="instructionBox" style="display:none;">
       <textarea id="aiInstruction" readonly style="width:100%;height:300px; font-family: monospace; font-size: 13px; line-height:1.4;">
-あなたはプロのゲーム翻訳者で特にSims 4の翻訳に特化した翻訳者です。文脈を重視した自然な日本語化を行い、直訳ではなくゲーム内の使用場面を考慮してください。また、シムズ4の既存用語との統一感も保持してください。その事を踏まえて翻訳リライトしてください。置き換え辞書形式でお願いします。
+あなたはプロのゲーム翻訳者で特にSims 4の翻訳に特化した翻訳者です。文脈を重視した自然な日本語化を行い、
+直訳ではなくゲーム内の使用場面を考慮してください。また、シムズ4の既存用語との統一感も保持してください。
+その事を踏まえて翻訳リライトしてください。置き換え辞書形式でお願いします。
 # ★リライト・翻訳時の注意★  
 # これは、THE SIMS 4のMOD用JSONファイルから文章部分のみを抽出したテキストファイルです。  
-# タグやプレースホルダー（例：{M0.HE}など）は下記の置き換え辞書を参考に翻訳しまた文章の流れで必要がなかったら削除してもかまいません。ただ シムの名前に関するタグは崩さずそのまま残してください。  
+# タグやプレースホルダー（例：{M0.HE}など）は下記の置き換え辞書を参考に翻訳し
+また文章の流れで必要がなかったら削除してもかまいません。ただ シムの名前に関するタグは崩さずそのまま残してください。  
 # また、日本語の助詞がタグ部分と重複する場合は、余分な助詞を取り除き、自然で読みやすい文章にリライトしてください。  
-# シムズ4の世界観に合う文章になるように、日本語として意味が通じる範囲で意訳を含めた翻訳リライトをお願いします。 後冗長？にならないようにお願いします。…の三点リーダーはなるべくつけないでくださいです。
+# シムズ4の世界観に合う文章になるように、日本語として意味が通じる範囲で意訳を含めた翻訳リライトをお願いします。  
+後冗長？にならないようにお願いします。…の三点リーダーはなるべくつけないでくださいです。
 
 '{M0.HE}': '{M0.彼}',
 '{M0.HIS}': '{M0.彼}',
@@ -159,199 +163,102 @@ const fileInput=document.getElementById("fileInput");
 const log=document.getElementById("log");
 
 function addLog(msg,type="info"){
-  log.style.display="block"; 
-  let color = type === "error" ? "#f66" : "#0f0";
-  log.innerHTML += "[" + new Date().toLocaleTimeString() + "] " + msg + "\n";
-  log.scrollTop = log.scrollHeight;
+log.style.display="block";
+let color=(type==="error")?"#f66":"#0f0";
+log.innerHTML+="["+new Date().toLocaleTimeString()+"] "+msg+"\\n";
+log.scrollTop=log.scrollHeight;
 }
-
-dropZone.addEventListener("dragover", e => { e.preventDefault(); });
-dropZone.addEventListener("drop", e => {
-  e.preventDefault();
-  const files = [...e.dataTransfer.files].filter(f => f.name.endsWith(".json"));
-  if (files.length > 0 && confirm("選択したJSONファイルを処理しますか？")) processFiles(files);
+dropZone.addEventListener("dragover",e=>{e.preventDefault();});
+dropZone.addEventListener("drop",e=>{
+e.preventDefault();
+const files=[...e.dataTransfer.files].filter(f=>f.name.endsWith(".json"));
+processFiles(files);
 });
-fileInput.addEventListener("change", e => {
-  const files = [...e.target.files];
-  if (files.length > 0 && confirm("選択したJSONファイルを処理しますか？")) processFiles(files);
-});
-
+fileInput.addEventListener("change",e=>{processFiles([...e.target.files]);});
 async function processFiles(files){
-  splitFiles = [];
-  for(const file of files){
-    addLog("📁 ファイル読込: " + file.name);
-    try{
-      const text = await file.text();
-      const json = JSON.parse(text);
-      await splitJsonData(json, file.name);
-    } catch(err){
-      addLog("❌ エラー: " + err.message, "error");
-    }
-  }
-  showResults();
+splitFiles=[];
+for(const file of files){
+addLog("📁 ファイル読込: "+file.name);
+try{
+const text=await file.text();
+const json=JSON.parse(text);
+await splitJsonData(json,file.name);
+}catch(err){
+addLog("❌ エラー: "+err.message,"error");
 }
-
-async function splitJsonData(jsonData, originalFileName){
-  const maxLines = parseInt(document.getElementById("maxLines")?.value) || 1000;
-  const splitMode = document.getElementById("splitMode")?.value || "valueExtract";
-  const naming = document.getElementById("naming")?.value || "part";
-  const autoTranslate = document.getElementById("autoTranslate")?.checked || false;
-  const baseName = originalFileName.replace(/\.json$/,"");
-  let index = 1;
-
-  if(splitMode === "valueExtract"){
-    await extractValuesFromJson(jsonData, baseName);
-    return;
-  }
-
-  if(splitMode === "smart"){
-    if(Array.isArray(jsonData)){
-      for(const chunk of jsonData){
-        let data = autoTranslate ? translateJson(chunk) : chunk;
-        await saveFile(JSON.stringify(data,null,2), makeFileName(baseName, index++, naming));
-      }
-    } else if(typeof jsonData === "object" && jsonData !== null){
-      for(const key in jsonData){
-        let data = autoTranslate ? translateJson(jsonData[key]) : jsonData[key];
-        await saveFile(JSON.stringify({[key]:data}, null, 2), makeFileName(baseName + "_" + key, index++, naming));
-      }
-    } else {
-      await saveFile(JSON.stringify(autoTranslate ? translateJson(jsonData) : jsonData, null, 2), baseName + "_full.json");
-    }
-    return;
-  }
-
-  if(splitMode === "array" && Array.isArray(jsonData)){
-    for(const chunk of jsonData){
-      let data = autoTranslate ? translateJson(chunk) : chunk;
-      await saveFile(JSON.stringify(data,null,2), makeFileName(baseName, index++, naming));
-    }
-  } else if(splitMode === "object" && typeof jsonData === "object" && jsonData !== null){
-    for(const key in jsonData){
-      let data = autoTranslate ? translateJson(jsonData[key]) : jsonData[key];
-      await saveFile(JSON.stringify({[key]:data}, null, 2), makeFileName(baseName + "_" + key, index++, naming));
-    }
-  } else if(splitMode === "line"){
-    const lines = JSON.stringify(jsonData, null, 2).split("\n");
-    let chunk = [];
-    for(let i = 0; i < lines.length; i++){
-      chunk.push(lines[i]);
-      if((i + 1) % maxLines === 0){
-        await saveFile(chunk.join("\n"), makeFileName(baseName, index++, naming));
-        chunk = [];
-      }
-    }
-    if(chunk.length > 0){
-      await saveFile(chunk.join("\n"), makeFileName(baseName, index++, naming));
-    }
-  } else {
-    await saveFile(JSON.stringify(autoTranslate ? translateJson(jsonData) : jsonData, null, 2), baseName + "_full.json");
-  }
 }
-
-async function extractValuesFromJson(jsonData, baseName){
-  let texts = [];
-
-  if(Array.isArray(jsonData)){
-    for(const item of jsonData){
-      if(item && typeof item === "object"){
-        if("Value" in item && typeof item.Value === "string"){
-          texts.push(item.Value);
-        } else if("value" in item && typeof item.value === "string"){
-          texts.push(item.value);
-        }
-      }
-    }
-  } else {
-    let entries = Array.isArray(jsonData.Entries) ? jsonData.Entries : [];
-    for(const e of entries){
-      if(typeof e === "object" && "Value" in e && typeof e.Value === "string"){
-        texts.push(e.Value);
-      }
-    }
-  }
-
-  if(texts.length === 0){
-    addLog("❌ Valueキーが見つかりませんでした", "error");
-    return;
-  }
-
-  const content = texts.join("\n");
-  await saveFile(content, baseName + "_extracted.txt");
-  addLog("✅ " + texts.length + "件抽出完了", "success");
+showResults();
 }
-
-function translateJson(obj){
-  if(typeof obj === "string"){
-    let out = obj;
-    for(const eng in translationDict){
-      out = out.replace(new RegExp(eng.replace(/[{}]/g, "\\$&"), "gi"), translationDict[eng]);
-    }
-    return out;
-  } else if(Array.isArray(obj)){
-    return obj.map(translateJson);
-  } else if(typeof obj === "object" && obj !== null){
-    const res = {};
-    for(const k in obj){
-      res[k] = translateJson(obj[k]);
-    }
-    return res;
-  }
-  return obj;
+async function splitJsonData(jsonData,originalFileName){
+const mode=document.getElementById("splitMode").value;
+const baseName=originalFileName.replace(/\\.json$/,"");
+if(mode==="valueExtract"){
+await extractValuesFromJson(jsonData,baseName);
+return;
 }
-
-function makeFileName(baseName, index, naming){
-  if(naming === "part") return `${baseName}_part${String(index).padStart(2,"0")}.json`;
-  if(naming === "function") return `${baseName}_func${index}.json`;
-  if(naming === "category") return `${baseName}_cat${index}.json`;
-  return `${baseName}_${index}.json`;
+if(mode==="array" && Array.isArray(jsonData)){
+await saveFile(JSON.stringify(jsonData,null,2),baseName+"\_full.json");
+}else if(mode==="object" && typeof jsonData==="object"){
+await saveFile(JSON.stringify(jsonData,null,2),baseName+"\_full.json");
+}else{
+addLog("⚠️ そのモードでは処理できない形式","error");
 }
-
-async function saveFile(content, fileName){
-  const blob = new Blob([content], {type:"text/plain"});
-  splitFiles.push({name: fileName, blob: blob, size: blob.size});
 }
-
+async function extractValuesFromJson(jsonData,baseName){
+let entries=Array.isArray(jsonData)?jsonData:(jsonData.Entries?jsonData.Entries:jsonData);
+let texts=[];
+if(Array.isArray(entries)){
+for(const e of entries){
+if(typeof e==="object" && e.Value){texts.push(e.Value);}
+}
+}
+if(texts.length===0){addLog("❌ Valueキーなし","error");return;}
+const content=texts.join("\\n");
+await saveFile(content,baseName+"\_extracted.txt");
+addLog("✅ "+texts.length+"件抽出完了");
+}
+async function saveFile(content,fileName){
+const blob=new Blob([content],{type:"text/plain"});
+splitFiles.push({name:fileName,blob:blob,size:blob.size});
+}
 function showResults(){
-  document.getElementById("results").style.display = "block";
-  const fileList = document.getElementById("fileList");
-  fileList.innerHTML = "";
-  splitFiles.forEach((f,i) => {
-    const div = document.createElement("div");
-    div.className = "file-item";
-    div.innerHTML = `<div>${f.name} (${(f.size/1024).toFixed(1)}KB)</div>
-                     <button class="download-btn" onclick="downloadFile(${i})">📥DL</button>`;
-    fileList.appendChild(div);
-  });
+const resultDiv=document.getElementById("results");
+const fileList=document.getElementById("fileList");
+resultDiv.style.display="block";
+fileList.innerHTML="";
+splitFiles.forEach((f,i)=>{
+const div=document.createElement("div");
+div.className="file-item";
+div.innerHTML=`<div>${f.name} (${(f.size/1024).toFixed(1)}KB)</div>
+<button class="download-btn" onclick="downloadFile(${i})">📥DL</button>`;
+fileList.appendChild(div);
+});
 }
-
 function downloadFile(i){
-  const f = splitFiles[i];
-  const url = URL.createObjectURL(f.blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = f.name;
-  a.click();
-  URL.revokeObjectURL(url);
+const f=splitFiles[i];
+const url=URL.createObjectURL(f.blob);
+const a=document.createElement("a");
+a.href=url;
+a.download=f.name;
+a.click();
+URL.revokeObjectURL(url);
 }
-
 function toggleInstruction(){
-  const box = document.getElementById("instructionBox");
-  const hint = document.getElementById("aiHint");
-  if(box.style.display === "none"){
-    box.style.display = "block";
-    hint.style.display = "block";
-  } else {
-    box.style.display = "none";
-    hint.style.display = "none";
-  }
+const box=document.getElementById("instructionBox");
+const hint=document.getElementById("aiHint");
+if(box.style.display==="none"){
+box.style.display="block";
+hint.style.display="block";
+}else{
+box.style.display="none";
+hint.style.display="none";
 }
-
+}
 function copyInstruction(){
-  const ta = document.getElementById("aiInstruction");
-  ta.select();
-  document.execCommand("copy");
-  alert("✅ コピペ用テキストをコピーしました！");
+const ta=document.getElementById("aiInstruction");
+ta.select();
+document.execCommand("copy");
+alert("✅ コピペ用テキストをコピーしました！");
 }
 </script>
 </body>
