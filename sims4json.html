@@ -1,265 +1,260 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>🌸 JSONからValueだけ抜いて置き換え辞書用分割できるよツール ✨</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:sans-serif; background:linear-gradient(135deg,#667eea,#764ba2); min-height:100vh; color:#333; }
-  .container { max-width:1200px; margin:auto; padding:20px; }
-  .header { text-align:center; color:#fff; margin-bottom:30px; }
-  .header h1 { font-size:2.2em; text-shadow:2px 2px 5px rgba(0,0,0,.3); margin-bottom:10px;}
-  .card { background:rgba(255,255,255,.95); border-radius:15px; padding:20px; margin-bottom:20px; }
-  .drop-zone { border:3px dashed #667eea; border-radius:10px; padding:40px 20px; text-align:center; cursor:pointer; background:#fafaff; transition:.3s;}
-  .drop-zone:hover { background:#f0f0ff; border-color:#764ba2;}
-  .file-input{display:none;}
-  .btn { background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; padding:10px 20px; border-radius:20px; cursor:pointer; margin:5px; }
-  .btn:hover { box-shadow:0 4px 10px rgba(0,0,0,0.3);}
-  .log{background:#111;color:#0f0;padding:10px;height:200px;overflow:auto;display:none;white-space:pre-wrap;font-size:14px;}
-  .file-item{background:#f8f9ff;padding:10px;margin:5px 0;border-left:4px solid #667eea;border-radius:10px;display:flex;justify-content:space-between;align-items:center;}
-  .download-btn{background:#52c41a;color:white;border:none;padding:5px 12px;border-radius:15px;cursor:pointer;}
-  .settings {display:grid;grid-template-columns:repeat(auto-fit, minmax(250px, 1fr));gap:15px;}
-  .setting-group {background:#f8f9ff;padding:10px;border-radius:10px;border-left:4px solid #667eea;}
-  .setting-group label{font-weight:bold;display:block;margin-bottom:5px;}
-  .setting-group small{font-size:12px;color:#555;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sims4 JSON抽出ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* ボタンにホバー時の拡大効果を追加 */
+        button, label {
+            transform: scale(1);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        button:hover, label:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+        }
+        /* カスタムのメッセージボックスのスタイル */
+        #messageBox {
+            animation: fade-in-out 3.5s forwards;
+        }
+        @keyframes fade-in-out {
+            0% { opacity: 0; transform: translateY(10px); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(10px); }
+        }
+        .copy-text-area {
+            background-color: #1f2937;
+            color: #d1d5db;
+            border: 1px solid #4b5563;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-size: 0.75rem;
+            line-height: 1.5;
+            overflow-x: auto;
+            max-height: 500px;
+        }
+        .collapsible-header {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center; /* 中央揃えに変更 */
+            transition: background-color 0.2s ease-in-out;
+            padding: 0.5rem; /* パディングを調整してシンプルに */
+            border-radius: 9999px; /* 円形にする */
+            width: 3rem; /* 幅を調整 */
+            height: 3rem; /* 高さを調整 */
+            margin: 0 auto; /* 中央配置 */
+        }
+        .collapsible-header:hover {
+            background-color: #374151; /* ホバー時の色 */
+        }
+        .collapsible-icon {
+            font-size: 1.5rem; /* アイコンサイズを調整 */
+            transition: transform 0.3s ease-in-out;
+        }
+        .collapsible-header.open .collapsible-icon {
+            transform: rotate(90deg);
+        }
+        .collapsible-content {
+            display: none;
+            overflow: hidden;
+        }
+    </style>
 </head>
-<body>
-<div class="container">
-  <div class="header">
-    <h1>🌸 JSONからValueだけ抜いて置き換え辞書用分割できるよツール ✨</h1>
-    <p>翻訳用Valueの抽出やJSONの分割を簡単にできます。nonemesims4作翻訳辞書を使った自動リライト簡易翻訳機能です。</p>
-  </div>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center p-4 text-gray-100">
+    <div class="bg-gray-800 bg-opacity-80 p-8 rounded-3xl shadow-2xl w-full max-w-2xl backdrop-blur-sm">
+        <h1 class="text-xl font-extrabold mb-4 text-center text-teal-400">✨ Sims4Translator専用置き換え辞書ベース作成ツール ✨</h1>
+        <p class="text-sm text-gray-300 mb-6 text-center">
+            Sims4TranslatorからエクスポートしたJSONファイルをアップロードしてね！「Value」だけを抜き出して、<code class="bg-gray-700 text-gray-200 p-1 rounded-md">{ "原文": "" }</code> の形式に自動で変換するよ。
+        </p>
+        
+        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
+            <label for="fileInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg">
+                ファイルを選択 📂
+            </label>
+            <input type="file" id="fileInput" accept=".json" class="hidden">
+            
+            <button id="downloadButton" onclick="downloadJSON()" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-8 rounded-full shadow-lg">
+                抽出結果を保存 💾
+            </button>
+        </div>
 
-  <div class="card">
-    <div class="drop-zone" id="dropZone" onclick="fileInput.click()">
-      <div>📁 JSONファイルをここにドロップまたはクリックして選択してください</div>
-      <input type="file" id="fileInput" class="file-input" accept=".json" multiple>
+        <div class="result">
+            <h3 class="text-lg font-semibold mb-2 text-gray-200">📝 抽出結果プレビュー</h3>
+            <textarea id="output" readonly class="w-full h-80 p-4 border border-gray-600 rounded-xl bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none text-xs shadow-inner"></textarea>
+            <div id="messageBox" class="mt-4 p-3 rounded-xl text-sm text-center font-medium opacity-0"></div>
+        </div>
+        
+        <!-- コピー用折りたたみパネル -->
+        <div class="mt-8">
+            <div id="collapsibleHeader" class="collapsible-header">
+                <span class="collapsible-icon text-gray-400 font-bold">▶</span>
+            </div>
+            <div id="collapsibleContent" class="collapsible-content mt-4">
+                <div class="copy-text-area">
+                    <p>あなたはプロのゲーム翻訳者で特にSims 4の翻訳に特化した翻訳者です。文脈を重視した自然な日本語化を行い、直訳ではなくゲーム内の使用場面を考慮してください。また、シムズ4の既存用語との統一感も保持してください。その事を踏まえて翻訳リライトしてください。置き換え辞書形式でお願いします。</p>
+
+                    <br>
+                    <p># ★リライト・翻訳時の注意★</p>
+                    <p># これは、THE SIMS 4のMOD用JSONファイルから文章部分のみを抽出したテキストファイルです。</p>
+                    <p># タグやプレースホルダー（例：{M0.HE}など）は下記の置き換え辞書を参考に翻訳しまた文章の流れで必要がなかったら削除してもかまいません。ただ シムの名前に関するタグは崩さずそのまま残してください。</p>
+                    <p># また、日本語の助詞がタグ部分と重複する場合は、余分な助詞を取り除き、自然で読みやすい文章にリライトしてください。</p>
+                    <p># シムズ4の世界観に合う文章になるように、日本語として意味が通じる範囲で意訳を含めた翻訳リライトをお願いします。 後冗長？にならないようにお願いします。…の三点リーダーはなるべくつけないでくださいです。</p>
+                    <br>
+                    <p># 置き換え辞書（タグ変換ルール）の詳細は以下のリンクをご参照ください。</p>
+                    <p># 安全な翻訳やタグの扱いについて不明な点がございましたら、上記のページに掲載されている解説をご確認のうえご対応ください。</p>
+                    <br>
+                    <br>
+                    <p># 一般的な代名詞の変換。小文字も考慮。</p>
+                    <p>'{M0.HE}': '{M0.彼}',</p>
+                    <p>'{M0.HIS}': '{M0.彼}',</p>
+                    <p>"{M0.HE'S}": "{M0.彼}",</p>
+                    <p>'{F0.SHE}': '{F0.彼女}',</p>
+                    <p>'{F0.HER}': '{F0.彼女}',</p>
+                    <p>"{F0.SHE'S}": "{F0.彼女}",</p>
+                    <p>'{M1.HE}': '{M1.彼}',</p>
+                    <p>'{M1.HIS}': '{M1.彼}',</p>
+                    <p>'{F1.SHE}': '{F1.彼女}',</p>
+                    <p>'{F1.HER}': '{F1.彼女}',</p>
+                    <br>
+                    <p># シムの名前に関するタグ</p>
+                    <p>'{0.SIMFIRSTNAME}': '{0.SimFirstName}',</p>
+                    <p>'{1.SIMFIRSTNAME}': '{1.SimFirstName}',</p>
+                    <br>
+                    <p># シムの代名詞（主格・所有格・再帰代名詞等）を日本語の「彼」「彼女」にまとめて表現</p>
+                    <p>'{0.SIMPRONOUNSUBJECTIVE}': '{M0.彼}{F0.彼女}',</p>
+                    <p>'{0.SIMPRONOUNPOSSESSIVEDEPENDENT}': '{M0.彼}{F0.彼女}',</p>
+                    <p>'{0.SIMPRONOUNREFLEXIVE}': '{M0.彼}{F0.彼女}',</p>
+                    <p>'{0.SIMPRONOUNOBJECTIVE}': '{M0.彼}{F0.彼女}',</p>
+                    <br>
+                    <p># 重複タグの削除（同じタグが連続する場合の整理）</p>
+                    <p>'{F0.彼女の}{F0.彼女}': '{F0.彼女}',</p>
+                    <p>'{F0.彼女}{F0.彼女の}': '{F0.彼女}',</p>
+                    <p>'{M0.彼の}{M0.彼}': '{M0.彼}',</p>
+                    <p>'{M0.彼}{M0.彼の}': '{M0.彼}',</p>
+                    <br>
+                    <p># 日本語の助詞とセットになったタグの余分な助詞を除去</p>
+                    <p>'{F0.彼女の}の': '{F0.彼女}',</p>
+                    <p>'{M0.彼の}の': '{M0.彼}',</p>
+                    <p>'{F0.彼女に}に': '{F0.彼女}',</p>
+                    <p>'{M0.彼に}に': '{M0.彼}',</p>
+                    <p>'{F0.彼女が}が': '{F0.彼女}',</p>
+                    <p>'{M0.彼が}が': '{M0.彼}',</p>
+                    <p>'{F0.彼女は}は': '{F0.彼女}',</p>
+                    <p>'{M0.彼は}は': '{M0.彼}',</p>
+                    <p>'{F0.彼女を}を': '{F0.彼女}',</p>
+                    <p>'{M0.彼を}を': '{M0.彼}',</p>
+                    <p>'{F0.彼女と}と': '{F0.彼女}',</p>
+                    <p>'{M0.彼と}と': '{M0.彼}',</p>
+                    <br>
+                    <p># タグ＋助詞＋は の形の重複も整理</p>
+                    <p>'{F0.彼女の}{F0.彼女}は': '{F0.彼女}',</p>
+                    <p>'{M0.彼の}{M0.彼}は': '{M0.彼}',</p>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-
-  <div class="card">
-    <h3>⚙️ 分割設定</h3>
-    <div class="settings">
-      <div class="setting-group">
-        <label for="maxLines">1ファイルの最大行数 📏</label>
-        <input type="number" id="maxLines" value="1000" min="100" max="5000" />
-        <small>1ファイルあたりの最大行数です。デフォルトは1000行、作業しやすいサイズです。</small>
-      </div>
-      <div class="setting-group">
-        <label for="splitMode">分割モード ✂️</label>
-        <select id="splitMode">
-          <option value="smart">スマート分割（推奨）</option>
-          <option value="object">オブジェクト単位</option>
-          <option value="array">配列単位</option>
-          <option value="line">行数指定</option>
-          <option value="valueExtract">Valueキー抽出（テキスト化）</option>
-        </select>
-        <small>Sims4MODなら「スマート分割」がおすすめです。</small>
-      </div>
-      <div class="setting-group">
-        <label for="naming">ファイル名形式 🏷️</label>
-        <select id="naming">
-          <option value="part">part01, part02...</option>
-          <option value="function">機能別</option>
-          <option value="category">カテゴリ別</option>
-        </select>
-        <small>後でリライトしやすい名前形式を選んでください。</small>
-      </div>
-      <div class="setting-group">
-        <label>🌸 自動翻訳リライト 🎌</label>
-        <input type="checkbox" id="autoTranslate"> 分割と同時に日本語翻訳も実行します
-        <small>nonemesims4作翻訳辞書を使った自動リライト簡易翻訳機能です。</small>
-      </div>
-    </div>
-  </div>
-
-  <div class="card"><div class="log" id="log"></div></div>
-
-  <div class="card" id="results" style="display:none;">
-    <h3>✨ 処理結果</h3>
-    <div id="fileList"></div>
-  </div>
-
-  <div class="card">
-    <h3 style="cursor:pointer;" onclick="toggleInstruction()">📜 AIリライト依頼文（クリックで展開/非表示）</h3>
-    <p id="aiHint" style="display:none;">これは簡易ツールなので、下のテキストをAIに投げてから編集すると楽です。</p>
-    <div id="instructionBox" style="display:none;">
-      <textarea id="aiInstruction" readonly style="width:100%;height:300px; font-family: monospace; font-size: 13px; line-height:1.4;">
-あなたはプロのゲーム翻訳者で特にSims 4の翻訳に特化した翻訳者です。文脈を重視した自然な日本語化を行い、
-直訳ではなくゲーム内の使用場面を考慮してください。また、シムズ4の既存用語との統一感も保持してください。
-その事を踏まえて翻訳リライトしてください。置き換え辞書形式でお願いします。
-# ★リライト・翻訳時の注意★  
-# これは、THE SIMS 4のMOD用JSONファイルから文章部分のみを抽出したテキストファイルです。  
-# タグやプレースホルダー（例：{M0.HE}など）は下記の置き換え辞書を参考に翻訳し
-また文章の流れで必要がなかったら削除してもかまいません。ただ シムの名前に関するタグは崩さずそのまま残してください。  
-# また、日本語の助詞がタグ部分と重複する場合は、余分な助詞を取り除き、自然で読みやすい文章にリライトしてください。  
-# シムズ4の世界観に合う文章になるように、日本語として意味が通じる範囲で意訳を含めた翻訳リライトをお願いします。  
-後冗長？にならないようにお願いします。…の三点リーダーはなるべくつけないでくださいです。
-
-'{M0.HE}': '{M0.彼}',
-'{M0.HIS}': '{M0.彼}',
-"{M0.HE'S}": "{M0.彼}",
-'{F0.SHE}': '{F0.彼女}',
-'{F0.HER}': '{F0.彼女}',
-"{F0.SHE'S}": "{F0.彼女}",
-'{M1.HE}': '{M1.彼}',
-'{M1.HIS}': '{M1.彼}',
-'{F1.SHE}': '{F1.彼女}',
-'{F1.HER}': '{F1.彼女}',
-'{0.SIMFIRSTNAME}': '{0.SimFirstName}',
-'{1.SIMFIRSTNAME}': '{1.SimFirstName}',
-'{0.SIMPRONOUNSUBJECTIVE}': '{M0.彼}{F0.彼女}',
-'{0.SIMPRONOUNPOSSESSIVEDEPENDENT}': '{M0.彼}{F0.彼女}',
-'{0.SIMPRONOUNREFLEXIVE}': '{M0.彼}{F0.彼女}',
-'{0.SIMPRONOUNOBJECTIVE}': '{M0.彼}{F0.彼女}',
-'{F0.彼女の}{F0.彼女}': '{F0.彼女}',
-'{F0.彼女}{F0.彼女の}': '{F0.彼女}',
-'{M0.彼の}{M0.彼}': '{M0.彼}',
-'{M0.彼}{M0.彼の}': '{M0.彼}',
-'{F0.彼女の}の': '{F0.彼女}',
-'{M0.彼の}の': '{M0.彼}',
-'{F0.彼女に}に': '{F0.彼女}',
-'{M0.彼に}に': '{M0.彼}',
-'{F0.彼女が}が': '{F0.彼女}',
-'{M0.彼が}が': '{M0.彼}',
-'{F0.彼女は}は': '{F0.彼女}',
-'{M0.彼は}は': '{M0.彼}',
-'{F0.彼女を}を': '{F0.彼女}',
-'{M0.彼を}を': '{M0.彼}',
-'{F0.彼女と}と': '{F0.彼女}',
-'{M0.彼と}と': '{M0.彼}',
-'{F0.彼女の}{F0.彼女}は': '{F0.彼女}',
-'{M0.彼の}{M0.彼}は': '{M0.彼}'
-      </textarea>
-      <button class="btn" onclick="copyInstruction()">📋 コピペする</button>
-    </div>
-  </div>
-</div>
 
 <script>
-let splitFiles = [];
-const translationDict = {
-  '{M0.HE}':'{M0.彼}','{M0.HIS}':'{M0.彼}',"{M0.HE'S}":"{M0.彼}",
-  '{F0.SHE}':'{F0.彼女}','{F0.HER}':'{F0.彼女}',"{F0.SHE'S}":"{F0.彼女}",
-  '{M1.HE}':'{M1.彼}','{M1.HIS}':'{M1.彼}', '{F1.SHE}':'{F1.彼女}','{F1.HER}':'{F1.彼女}',
-  '{0.SIMFIRSTNAME}':'{0.SimFirstName}','{1.SIMFIRSTNAME}':'{1.SimFirstName}',
-  '{0.SIMPRONOUNSUBJECTIVE}':'{M0.彼}{F0.彼女}','{0.SIMPRONOUNPOSSESSIVEDEPENDENT}':'{M0.彼}{F0.彼女}',
-  '{0.SIMPRONOUNREFLEXIVE}':'{M0.彼}{F0.彼女}','{0.SIMPRONOUNOBJECTIVE}':'{M0.彼}{F0.彼女}',
-  '{F0.彼女の}{F0.彼女}':'{F0.彼女}','{F0.彼女}{F0.彼女の}':'{F0.彼女}',
-  '{M0.彼の}{M0.彼}':'{M0.彼}','{M0.彼}{M0.彼の}':'{M0.彼}',
-  '{F0.彼女の}の':'{F0.彼女}','{M0.彼の}の':'{M0.彼}',
-  '{F0.彼女に}に':'{F0.彼女}','{M0.彼に}に':'{M0.彼}',
-  '{F0.彼女が}が':'{F0.彼女}','{M0.彼が}が':'{M0.彼}',
-  '{F0.彼女は}は':'{F0.彼女}','{M0.彼は}は':'{M0.彼}',
-  '{F0.彼女を}を':'{F0.彼女}','{M0.彼を}を':'{M0.彼}',
-  '{F0.彼女と}と':'{F0.彼女}','{M0.彼と}と':'{M0.彼}',
-  '{F0.彼女の}{F0.彼女}は':'{F0.彼女}','{M0.彼の}{M0.彼}は':'{M0.彼}'
-};
+    // グローバル変数を定義して、抽出されたデータを保持します
+    let extracted = {};
 
-const dropZone=document.getElementById("dropZone");
-const fileInput=document.getElementById("fileInput");
-const log=document.getElementById("log");
+    // メッセージボックスにメッセージを表示する関数
+    function showMessage(message, type) {
+        const messageBox = document.getElementById('messageBox');
+        messageBox.textContent = message;
+        messageBox.style.animation = 'none'; // アニメーションをリセット
+        messageBox.offsetHeight; // リフローを強制
+        messageBox.style.animation = '';
 
-function addLog(msg,type="info"){
-log.style.display="block";
-let color=(type==="error")?"#f66":"#0f0";
-log.innerHTML+="["+new Date().toLocaleTimeString()+"] "+msg+"\\n";
-log.scrollTop=log.scrollHeight;
-}
-dropZone.addEventListener("dragover",e=>{e.preventDefault();});
-dropZone.addEventListener("drop",e=>{
-e.preventDefault();
-const files=[...e.dataTransfer.files].filter(f=>f.name.endsWith(".json"));
-processFiles(files);
-});
-fileInput.addEventListener("change",e=>{processFiles([...e.target.files]);});
-async function processFiles(files){
-splitFiles=[];
-for(const file of files){
-addLog("📁 ファイル読込: "+file.name);
-try{
-const text=await file.text();
-const json=JSON.parse(text);
-await splitJsonData(json,file.name);
-}catch(err){
-addLog("❌ エラー: "+err.message,"error");
-}
-}
-showResults();
-}
-async function splitJsonData(jsonData,originalFileName){
-const mode=document.getElementById("splitMode").value;
-const baseName=originalFileName.replace(/\\.json$/,"");
-if(mode==="valueExtract"){
-await extractValuesFromJson(jsonData,baseName);
-return;
-}
-if(mode==="array" && Array.isArray(jsonData)){
-await saveFile(JSON.stringify(jsonData,null,2),baseName+"\_full.json");
-}else if(mode==="object" && typeof jsonData==="object"){
-await saveFile(JSON.stringify(jsonData,null,2),baseName+"\_full.json");
-}else{
-addLog("⚠️ そのモードでは処理できない形式","error");
-}
-}
-async function extractValuesFromJson(jsonData,baseName){
-let entries=Array.isArray(jsonData)?jsonData:(jsonData.Entries?jsonData.Entries:jsonData);
-let texts=[];
-if(Array.isArray(entries)){
-for(const e of entries){
-if(typeof e==="object" && e.Value){texts.push(e.Value);}
-}
-}
-if(texts.length===0){addLog("❌ Valueキーなし","error");return;}
-const content=texts.join("\\n");
-await saveFile(content,baseName+"\_extracted.txt");
-addLog("✅ "+texts.length+"件抽出完了");
-}
-async function saveFile(content,fileName){
-const blob=new Blob([content],{type:"text/plain"});
-splitFiles.push({name:fileName,blob:blob,size:blob.size});
-}
-function showResults(){
-const resultDiv=document.getElementById("results");
-const fileList=document.getElementById("fileList");
-resultDiv.style.display="block";
-fileList.innerHTML="";
-splitFiles.forEach((f,i)=>{
-const div=document.createElement("div");
-div.className="file-item";
-div.innerHTML=`<div>${f.name} (${(f.size/1024).toFixed(1)}KB)</div>
-<button class="download-btn" onclick="downloadFile(${i})">📥DL</button>`;
-fileList.appendChild(div);
-});
-}
-function downloadFile(i){
-const f=splitFiles[i];
-const url=URL.createObjectURL(f.blob);
-const a=document.createElement("a");
-a.href=url;
-a.download=f.name;
-a.click();
-URL.revokeObjectURL(url);
-}
-function toggleInstruction(){
-const box=document.getElementById("instructionBox");
-const hint=document.getElementById("aiHint");
-if(box.style.display==="none"){
-box.style.display="block";
-hint.style.display="block";
-}else{
-box.style.display="none";
-hint.style.display="none";
-}
-}
-function copyInstruction(){
-const ta=document.getElementById("aiInstruction");
-ta.select();
-document.execCommand("copy");
-alert("✅ コピペ用テキストをコピーしました！");
-}
+        if (type === 'success') {
+            messageBox.className = 'mt-4 p-3 rounded-xl text-sm text-center font-medium bg-green-800 text-white opacity-100';
+        } else if (type === 'error') {
+            messageBox.className = 'mt-4 p-3 rounded-xl text-sm text-center font-medium bg-red-800 text-white opacity-100';
+        } else {
+            messageBox.className = 'mt-4 p-3 rounded-xl text-sm text-center font-medium bg-gray-600 text-gray-100 opacity-100';
+        }
+    }
+
+    // ファイル入力の変更イベントをリッスンします
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                // ファイルの内容をJSONとしてパース
+                const data = JSON.parse(e.target.result);
+                // "Entries"キーまたはルート配列からデータを取得
+                const entries = Array.isArray(data) ? data : (data.Entries || []);
+                extracted = {};
+
+                // 各エントリをループ処理し、「Value」を抽出
+                entries.forEach(entry => {
+                    if (entry.Value) {
+                        extracted[entry.Value] = "";
+                    }
+                });
+
+                // 結果を整形してテキストエリアに表示
+                document.getElementById('output').value = JSON.stringify(extracted, null, 2);
+                showMessage('JSONの抽出が完了しました！', 'success');
+            } catch (err) {
+                // JSONパースエラーを処理
+                showMessage('JSONを正しく読み込めませんでした。😢 ファイルが有効なJSON形式であることを確認してね。', 'error');
+                document.getElementById('output').value = '';
+            }
+        };
+        // ファイルの内容をテキストとして読み込み
+        reader.readAsText(file, "UTF-8");
+    });
+
+    // 抽出結果をJSONファイルとしてダウンロードする関数
+    function downloadJSON() {
+        // 抽出されたデータがない場合は警告
+        if (!Object.keys(extracted).length) {
+            showMessage("まだ抽出結果がありません。先にJSONファイルをアップロードしてね！", 'error');
+            return;
+        }
+
+        // Blobオブジェクトを作成してダウンロードリンクを生成
+        const blob = new Blob([JSON.stringify(extracted, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "extracted_texts.json";
+        
+        // 仮想クリックでダウンロードを開始
+        document.body.appendChild(a);
+        a.click();
+        
+        // URLオブジェクトを解放
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showMessage("JSONファイルのダウンロードを開始しました！", 'success');
+    }
+
+    // 折りたたみパネルのスクリプト
+    const collapsibleHeader = document.getElementById('collapsibleHeader');
+    const collapsibleContent = document.getElementById('collapsibleContent');
+
+    collapsibleHeader.addEventListener('click', () => {
+        const isOpen = collapsibleHeader.classList.toggle('open');
+        collapsibleContent.style.display = isOpen ? 'block' : 'none';
+    });
 </script>
 </body>
 </html>
