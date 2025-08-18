@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📑 JSONからValueだけ抜いて置き換え辞書用分割できるよツール</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:sans-serif; background:linear-gradient(135deg,#667eea,#764ba2); min-height:100vh; color:#333; }
+    .container { max-width:1200px; margin:auto; padding:20px; }
+    .header { text-align:center; color:#fff; margin-bottom:30px; }
+    .header h1 { font-size:2em; text-shadow:2px 2px 5px rgba(0,0,0,.3); }
+    .card { background:rgba(255,255,255,.95); border-radius:15px; padding:20px; margin-bottom:20px; }
+    .drop-zone { border:3px dashed #667eea; border-radius:10px; padding:40px 20px; text-align:center; cursor:pointer; background:#fafaff; }
+    .drop-zone:hover { background:#f0f0ff; }
+    .file-input{display:none;}
+    .btn { background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; padding:10px 20px; border-radius:20px; cursor:pointer; margin:5px; }
+    .btn:hover { box-shadow:0 4px 10px rgba(0,0,0,0.3);}
+    .log{background:#111;color:#0f0;padding:10px;height:200px;overflow:auto;display:none;white-space:pre-wrap;font-size:14px;}
+    .file-item{background:#f8f9ff;padding:10px;margin:5px 0;border-left:4px solid #667eea;border-radius:10px;display:flex;justify-content:space-between;align-items:center;}
+    .download-btn{background:#52c41a;color:white;border:none;padding:5px 12px;border-radius:15px;cursor:pointer;}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📑 JSONからValueだけ抜いて置き換え辞書用分割できるよツール</h1>
+    <p>翻訳用のValue抽出やJSON分割をブラウザだけでできる！</p>
+  </div>
+
+  <div class="card">
+    <div class="drop-zone" id="dropZone" onclick="fileInput.click()">
+      <div>📁 JSONファイルをここにドロップ or クリック</div>
+      <input type="file" id="fileInput" class="file-input" accept=".json" multiple>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>⚙️ モード選択</h3>
+    <select id="splitMode">
+      <option value="valueExtract">Value抽出（テキスト化）</option>
+      <option value="array">配列単位で分割</option>
+      <option value="object">オブジェクト単位で分割</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="card" id="results" style="display:none;">
+    <h3>✨ 処理結果</h3>
+    <div id="fileList"></div>
+  </div>
+
+  <!-- 折り畳み式AIリライト依頼文 -->
+  <div class="card">
+    <h3 style="cursor:pointer;" onclick="toggleInstruction()">📜 AIリライト依頼文（クリックで展開/非表示）</h3>
+    <p id="aiHint" style="display:none;">これは簡易ツールなので、↓をAIに投げてから編集すると楽だお。</p>
+    <div id="instructionBox" style="display:none;">
+      <textarea id="aiInstruction" readonly style="width:100%;height:300px;">
+あなたはプロのゲーム翻訳者で特にSims 4の翻訳に特化した翻訳者です。文脈を重視した自然な日本語化を行い、直訳ではなくゲーム内の使用場面を考慮してください。また、シムズ4の既存用語との統一感も保持してください。その事を踏まえて翻訳リライトしてください。置き換え辞書形式でお願いします。
+# ★リライト・翻訳時の注意★  
+# これは、THE SIMS 4のMOD用JSONファイルから文章部分のみを抽出したテキストファイルです。  
+# タグやプレースホルダー（例：{M0.HE}など）は下記の置き換え辞書を参考に翻訳しまた文章の流れで必要がなかったら削除してもかまいません。ただ シムの名前に関するタグは崩さずそのまま残してください。  
+# また、日本語の助詞がタグ部分と重複する場合は、余分な助詞を取り除き、自然で読みやすい文章にリライトしてください。  
+# シムズ4の世界観に合う文章になるように、日本語として意味が通じる範囲で意訳を含めた翻訳リライトをお願いします。 後冗長？にならないようにお願いします。…の三点リーダーはなるべくつけないでくださいです。
+
+    '{M0.HE}': '{M0.彼}',
+    '{M0.HIS}': '{M0.彼}',
+    "{M0.HE'S}": "{M0.彼}",
+    '{F0.SHE}': '{F0.彼女}',
+    '{F0.HER}': '{F0.彼女}',
+    "{F0.SHE'S}": "{F0.彼女}",
+    '{M1.HE}': '{M1.彼}',
+    '{M1.HIS}': '{M1.彼}',
+    '{F1.SHE}': '{F1.彼女}',
+    '{F1.HER}': '{F1.彼女}',
+    '{0.SIMFIRSTNAME}': '{0.SimFirstName}',
+    '{1.SIMFIRSTNAME}': '{1.SimFirstName}',
+    '{0.SIMPRONOUNSUBJECTIVE}': '{M0.彼}{F0.彼女}',
+    '{0.SIMPRONOUNPOSSESSIVEDEPENDENT}': '{M0.彼}{F0.彼女}',
+    '{0.SIMPRONOUNREFLEXIVE}': '{M0.彼}{F0.彼女}',
+    '{0.SIMPRONOUNOBJECTIVE}': '{M0.彼}{F0.彼女}',
+    '{F0.彼女の}{F0.彼女}': '{F0.彼女}',
+    '{F0.彼女}{F0.彼女の}': '{F0.彼女}',
+    '{M0.彼の}{M0.彼}': '{M0.彼}',
+    '{M0.彼}{M0.彼の}': '{M0.彼}',
+    '{F0.彼女の}の': '{F0.彼女}',
+    '{M0.彼の}の': '{M0.彼}',
+    '{F0.彼女に}に': '{F0.彼女}',
+    '{M0.彼に}に': '{M0.彼}',
+    '{F0.彼女が}が': '{F0.彼女}',
+    '{M0.彼が}が': '{M0.彼}',
+    '{F0.彼女は}は': '{F0.彼女}',
+    '{M0.彼は}は': '{M0.彼}',
+    '{F0.彼女を}を': '{F0.彼女}',
+    '{M0.彼を}を': '{M0.彼}',
+    '{F0.彼女と}と': '{F0.彼女}',
+    '{M0.彼と}と': '{M0.彼}',
+    '{F0.彼女の}{F0.彼女}は': '{F0.彼女}',
+    '{M0.彼の}{M0.彼}は': '{M0.彼}'
+      </textarea>
+      <button class="btn" onclick="copyInstruction()">📋 コピペする</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let splitFiles = [];
+const dropZone=document.getElementById("dropZone");
+const fileInput=document.getElementById("fileInput");
+const log=document.getElementById("log");
+
+function addLog(msg,type="info"){
+  log.style.display="block";
+  let color=(type==="error")?"#f66":"#0f0";
+  log.innerHTML+="["+new Date().toLocaleTimeString()+"] "+msg+"\n";
+  log.scrollTop=log.scrollHeight;
+}
+
+dropZone.addEventListener("dragover",e=>{e.preventDefault();});
+dropZone.addEventListener("drop",e=>{
+  e.preventDefault();
+  const files=[...e.dataTransfer.files].filter(f=>f.name.endsWith(".json"));
+  processFiles(files);
+});
+fileInput.addEventListener("change",e=>{processFiles([...e.target.files]);});
+
+async function processFiles(files){
+  splitFiles=[];
+  for(const file of files){
+    addLog("📁 ファイル読込: "+file.name);
+    try{
+      const text=await file.text();
+      const json=JSON.parse(text);
+      await splitJsonData(json,file.name);
+    }catch(err){
+      addLog("❌ エラー: "+err.message,"error");
+    }
+  }
+  showResults();
+}
+
+async function splitJsonData(jsonData,originalFileName){
+  const mode=document.getElementById("splitMode").value;
+  const baseName=originalFileName.replace(/\.json$/,"");
+
+  if(mode==="valueExtract"){
+    await extractValuesFromJson(jsonData,baseName);
+    return;
+  }
+  if(mode==="array" && Array.isArray(jsonData)){
+    await saveFile(JSON.stringify(jsonData,null,2),baseName+"_full.json");
+  }else if(mode==="object" && typeof jsonData==="object"){
+    await saveFile(JSON.stringify(jsonData,null,2),baseName+"_full.json");
+  }else{
+    addLog("⚠️ そのモードでは処理できない形式","error");
+  }
+}
+
+async function extractValuesFromJson(jsonData,baseName){
+  let entries=Array.isArray(jsonData)?jsonData:(jsonData.Entries?jsonData.Entries:jsonData);
+  let texts=[];
+  if(Array.isArray(entries)){
+    for(const e of entries){
+      if(typeof e==="object" && e.Value){texts.push(e.Value);}
+    }
+  }
+  if(texts.length===0){addLog("❌ Valueキーなし","error");return;}
+  const content=texts.join("\n");
+  await saveFile(content,baseName+"_extracted.txt");
+  addLog("✅ "+texts.length+"件抽出完了");
+}
+
+async function saveFile(content,fileName){
+  const blob=new Blob([content],{type:"text/plain"});
+  splitFiles.push({name:fileName,blob:blob,size:blob.size});
+}
+
+function showResults(){
+  const resultDiv=document.getElementById("results");
+  const fileList=document.getElementById("fileList");
+  resultDiv.style.display="block";
+  fileList.innerHTML="";
+  splitFiles.forEach((f,i)=>{
+    const div=document.createElement("div");
+    div.className="file-item";
+    div.innerHTML=`<div>${f.name} (${(f.size/1024).toFixed(1)}KB)</div>
+    <button class="download-btn" onclick="downloadFile(${i})">📥DL</button>`;
+    fileList.appendChild(div);
+  });
+}
+
+function downloadFile(i){
+  const f=splitFiles[i];
+  const url=URL.createObjectURL(f.blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=f.name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function toggleInstruction(){
+  const box=document.getElementById("instructionBox");
+  const hint=document.getElementById("aiHint");
+  if(box.style.display==="none"){
+    box.style.display="block";
+    hint.style.display="block";
+  }else{
+    box.style.display="none";
+    hint.style.display="none";
+  }
+}
+function copyInstruction(){
+  const ta=document.getElementById("aiInstruction");
+  ta.select();
+  document.execCommand("copy");
+  alert("✅ コピペ用テキストをコピーしました！");
+}
+</script>
+</body>
+</html>
