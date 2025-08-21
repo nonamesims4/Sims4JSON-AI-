@@ -70,10 +70,48 @@
             display: none;
             overflow: hidden;
         }
+        /* 新しいモーダル/ダイアログのスタイル */
+        .modal {
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+        .modal.open {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background-color: #1f2937;
+            color: #d1d5db;
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease-in-out;
+        }
+        .modal.open .modal-content {
+            transform: translateY(0);
+        }
+        .modal-content h4 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
 <body class="bg-gray-900 min-h-screen flex items-center justify-center p-4 text-gray-100">
-    <div class="bg-gray-800 bg-opacity-80 p-8 rounded-3xl shadow-2xl w-full max-w-2xl backdrop-blur-sm">
+    <div class="bg-gray-800 bg-opacity-80 p-8 rounded-3xl shadow-2xl w-full max-w-4xl backdrop-blur-sm">
         <h1 class="text-xl font-extrabold mb-4 text-center text-teal-400">✨ Sims4Translator専用置き換え辞書ベース作成ツール ✨</h1>
         <p class="text-sm text-gray-300 mb-6 text-center">
             Sims4TranslatorからエクスポートしたJSONファイルをアップロードしてね！「Value」だけを抜き出して、<code class="bg-gray-700 text-gray-200 p-1 rounded-md">{ "原文": "" }</code> の形式に自動で変換するよ。
@@ -83,16 +121,69 @@
             <label for="fileInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg">
                 ファイルを選択 📂
             </label>
-            <input type="file" id="fileInput" accept=".json" class="hidden">
-            
-            <button id="downloadButton" onclick="downloadJSON()" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-8 rounded-full shadow-lg">
-                抽出結果を保存 💾
+            <button id="toggleViewButton" onclick="toggleView()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg">
+                分割プレビューに切り替え ↔️
             </button>
+            <button id="downloadAllButton" onclick="showDownloadAllModal()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg">
+                抽出結果をまとめて保存 💾
+            </button>
+            <input type="file" id="fileInput" accept=".json" class="hidden">
         </div>
 
         <div class="result">
             <h3 class="text-lg font-semibold mb-2 text-gray-200">📝 抽出結果プレビュー</h3>
-            <textarea id="output" readonly class="w-full h-80 p-4 border border-gray-600 rounded-xl bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none text-xs shadow-inner"></textarea>
+            
+            <!-- 単一プレビューエリア -->
+            <div id="single-view-container">
+                <div class="relative">
+                    <textarea id="output-single" readonly class="w-full h-80 p-4 border border-gray-600 rounded-xl bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none text-xs shadow-inner"></textarea>
+                    <button onclick="copyToClipboard('output-single')" class="absolute top-2 right-2 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-full shadow-lg text-xs">
+                        📋 コピー
+                    </button>
+                </div>
+                <div id="pagination-controls-single" class="flex justify-center items-center space-x-4 mt-4 hidden">
+                    <button id="prev-page-single" onclick="prevPage('single')" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-full text-white font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">◀ Prev</button>
+                    <span id="page-info-single" class="text-sm text-gray-400"></span>
+                    <button id="next-page-single" onclick="nextPage('single')" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-full text-white font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">Next ▶</button>
+                </div>
+            </div>
+
+            <!-- 分割プレビューエリア -->
+            <div id="dual-view-container" class="hidden flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+                <div class="w-full md:w-1/2">
+                    <div class="relative">
+                        <textarea id="output-left" readonly class="w-full h-80 p-4 border border-gray-600 rounded-xl bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none text-xs shadow-inner"></textarea>
+                        <button onclick="copyToClipboard('output-left')" class="absolute top-2 right-2 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-full shadow-lg text-xs">
+                            📋 コピー
+                        </button>
+                    </div>
+                    <div id="pagination-controls-left" class="flex justify-center items-center space-x-4 mt-4">
+                        <button onclick="prevPage('left')" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-full text-white font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">◀ Prev</button>
+                        <span id="page-info-left" class="text-sm text-gray-400"></span>
+                        <button onclick="nextPage('left')" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-full text-white font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">Next ▶</button>
+                    </div>
+                    <div class="mt-4 flex justify-center">
+                        <button onclick="showDownloadPaneModal('left')" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-6 rounded-full shadow-lg">このページを保存 📄</button>
+                    </div>
+                </div>
+                <div class="w-full md:w-1/2">
+                    <div class="relative">
+                        <textarea id="output-right" readonly class="w-full h-80 p-4 border border-gray-600 rounded-xl bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none text-xs shadow-inner"></textarea>
+                        <button onclick="copyToClipboard('output-right')" class="absolute top-2 right-2 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-full shadow-lg text-xs">
+                            📋 コピー
+                        </button>
+                    </div>
+                    <div id="pagination-controls-right" class="flex justify-center items-center space-x-4 mt-4">
+                        <button onclick="prevPage('right')" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-full text-white font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">◀ Prev</button>
+                        <span id="page-info-right" class="text-sm text-gray-400"></span>
+                        <button onclick="nextPage('right')" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-full text-white font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">Next ▶</button>
+                    </div>
+                    <div class="mt-4 flex justify-center">
+                        <button onclick="showDownloadPaneModal('right')" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-6 rounded-full shadow-lg">このページを保存 📄</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="messageBox" class="mt-4 p-3 rounded-xl text-sm text-center font-medium opacity-0"></div>
         </div>
         
@@ -164,12 +255,54 @@
                 </div>
             </div>
         </div>
+        
+        <!-- ブックマークレットの折りたたみパネル -->
+        <div class="fixed bottom-4 right-4 z-50">
+            <div id="bookmarkletHeader" class="bg-gray-700 hover:bg-gray-600 text-gray-400 font-bold p-3 rounded-full shadow-lg cursor-pointer transform scale-100 hover:scale-110 transition-transform duration-200">
+                <span class="collapsible-icon">🔖</span>
+            </div>
+            <div id="bookmarkletContent" class="hidden absolute bottom-16 right-0 w-80 bg-gray-800 p-4 rounded-xl shadow-2xl text-gray-100">
+                <h4 class="font-bold mb-2">ブックマークレット</h4>
+                <p class="text-xs text-gray-400 mb-2">
+                    以下のコードをブックマークに登録すると、翻訳作業がさらに効率的になります。
+                </p>
+                <textarea id="bookmarkletCode" readonly class="w-full h-40 bg-gray-900 text-xs text-gray-300 p-2 rounded-lg resize-none border border-gray-600"></textarea>
+                <button onclick="copyBookmarklet()" class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full shadow-lg text-sm">
+                    コードをコピー 📋
+                </button>
+            </div>
+        </div>
+
+        <!-- ダウンロード形式選択用モーダル -->
+        <div id="downloadModal" class="modal">
+            <div class="modal-content">
+                <h4 class="font-bold mb-4">保存形式を選択</h4>
+                <div class="flex flex-col space-y-4">
+                    <button id="saveAsJsonBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg">
+                        JSON形式で保存
+                    </button>
+                    <button id="saveAsTextBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-lg">
+                        テキスト形式で保存
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
 <script>
     // グローバル変数を定義して、抽出されたデータを保持します
-    let extracted = {};
+    let extractedData = {};
+    let extractedKeys = [];
+    let currentPageSingle = 0;
+    let currentPageLeft = 0;
+    let currentPageRight = 1;
+    const itemsPerPage = 300;
+    let isDualView = false;
+    let currentDownloadContext = ''; // 'all' or 'left' or 'right'
 
+    // ブックマークレットのコード
+    const bookmarkletCode = `javascript:(async function() { try { const textarea = document.querySelector('textarea, input[type="text"], [contenteditable="true"]'); if (!textarea) { alert('テキストエリアが見つかりません'); return; } const text = textarea.value || textarea.innerText || ''; if (!text) { alert('テキストが空です'); return; } const prompt = \`あなたはプロのゲーム翻訳者で特にSims 4の翻訳に特化した翻訳者です。文脈を重視した自然な日本語化を行い、直訳ではなくゲーム内の使用場面を考慮してください。また、シムズ4の既存用語との統一感も保持してください。その事を踏まえて翻訳リライトしてください。置き換え辞書形式でお願いします。# ★リライト・翻訳時の注意★ # これは、THE SIMS 4のMOD用JSONファイルから文章部分のみを抽出したテキストファイルです。 # タグやプレースホルダー（例：{M0.HE}など）は下記の置き換え辞書を参考に翻訳しまた文章の流れで必要がなかったら削除してもかまいません。ただ シムの名前に関するタグは崩さずそのまま残してください。 # また、日本語の助詞がタグ部分と重複する場合は、余分な助詞を取り除き、自然で読みやすい文章にリライトしてください。 # シムズ4の世界観に合う文章になるように、日本語として意味が通じる範囲で意訳を含めた翻訳リライトをお願いします。 後冗長？にならないようにお願いします。…の三点リーダーはなるべくつけないでくださいです。# 置き換え辞書（タグ変換ルール）の詳細は以下のリンクをご参照ください。 # [https://nonamesims4.github.io/Sims4JSON-AI-/](https://nonamesims4.github.io/Sims4JSON-AI-/) # 安全な翻訳やタグの扱いについて不明な点がございましたら、上記のページに掲載されている解説をご確認のうえご対応ください。 # 一般的な代名詞の変換。小文字も考慮。 '{M0.HE}': '{M0.彼}', '{M0.HIS}': '{M0.彼}', "{M0.HE'S}": "{M0.彼}", '{F0.SHE}': '{F0.彼女}', '{F0.HER}': '{F0.彼女}', "{F0.SHE'S}": "{F0.彼女}", '{M1.HE}': '{M1.彼}', '{M1.HIS}': '{M1.彼}', '{F1.SHE}': '{F1.彼女}', '{F1.HER}': '{F1.彼女}', # シムの名前に関するタグ '{0.SIMFIRSTNAME}': '{0.SimFirstName}', '{1.SIMFIRSTNAME}': '{1.SimFirstName}', # シムの代名詞（主格・所有格・再帰代名詞等）を日本語の「彼」「彼女」にまとめて表現 '{0.SIMPRONOUNSUBJECTIVE}': '{M0.彼}{F0.彼女}', '{0.SIMPRONOUNPOSSESSIVEDEPENDENT}': '{M0.彼}{F0.彼女}', '{0.SIMPRONOUNREFLEXIVE}': '{M0.彼}{F0.彼女}', '{0.SIMPRONOUNOBJECTIVE}': '{M0.彼}{F0.彼女}', # 重複タグの削除（同じタグが連続する場合の整理） '{F0.彼女の}{F0.彼女}': '{F0.彼女}', '{F0.彼女}{F0.彼女の}': '{F0.彼女}', '{M0.彼の}{M0.彼}': '{M0.彼}', '{M0.彼}{M0.彼の}': '{M0.彼}', # 日本語の助詞とセットになったタグの余分な助詞を除去 '{F0.彼女の}の': '{F0.彼女}', '{M0.彼の}の': '{M0.彼}', '{F0.彼女に}に': '{F0.彼女}', '{M0.彼に}に': '{M0.彼}', '{F0.彼女が}が': '{F0.彼女}', '{M0.彼が}が': '{M0.彼}', '{F0.彼女は}は': '{F0.彼女}', '{M0.彼は}は': '{M0.彼}', '{F0.彼女を}を': '{F0.彼女}', '{M0.彼を}を': '{M0.彼}', '{F0.彼女と}と': '{F0.彼女}', '{M0.彼と}と': '{M0.彼}', # タグ＋助詞＋は の形の重複も整理 '{F0.彼女の}{F0.彼女}は': '{F0.彼女}', '{M0.彼の}{M0.彼}は': '{M0.彼}',\` const combined = prompt + "\\n\\n" + text; const tempInput = document.createElement('textarea'); tempInput.value = combined; document.body.appendChild(tempInput); tempInput.select(); document.execCommand('copy'); document.body.removeChild(tempInput); window.open('https://grok.com/'); alert('プロンプトとテキストを結合してクリップボードにコピーしました。Grokページでペーストしてください。'); } catch (e) { alert('エラーが発生しました: ' + e.message); } })();`;
+    
     // メッセージボックスにメッセージを表示する関数
     function showMessage(message, type) {
         const messageBox = document.getElementById('messageBox');
@@ -187,7 +320,95 @@
         }
     }
 
-    // ファイル入力の変更イベントをリッスンします
+    // クリップボードにコピーする関数
+    function copyToClipboard(elementId) {
+        const outputArea = document.getElementById(elementId);
+        if (outputArea.value) {
+            outputArea.select();
+            document.execCommand('copy');
+            showMessage('クリップボードにコピーしました！', 'success');
+        } else {
+            showMessage('コピーする内容がありません。', 'error');
+        }
+    }
+
+    // 抽出結果を表示する関数
+    function displayResults() {
+        const outputSingle = document.getElementById('output-single');
+        const paginationSingle = document.getElementById('pagination-controls-single');
+        const dualViewContainer = document.getElementById('dual-view-container');
+        const singleViewContainer = document.getElementById('single-view-container');
+        const toggleViewButton = document.getElementById('toggleViewButton');
+
+        if (extractedKeys.length === 0) {
+            outputSingle.value = '';
+            paginationSingle.classList.add('hidden');
+            singleViewContainer.classList.remove('hidden');
+            dualViewContainer.classList.add('hidden');
+            toggleViewButton.disabled = true;
+            return;
+        }
+
+        toggleViewButton.disabled = false;
+
+        if (isDualView) {
+            singleViewContainer.classList.add('hidden');
+            dualViewContainer.classList.remove('hidden');
+            displayPane('left', currentPageLeft);
+            displayPane('right', currentPageRight);
+        } else {
+            singleViewContainer.classList.remove('hidden');
+            dualViewContainer.classList.add('hidden');
+            displayPane('single', currentPageSingle);
+        }
+    }
+
+    // 特定のプレビューエリアに結果を表示する関数
+    function displayPane(pane, page) {
+        let outputArea, pageInfo, prevButton, nextButton;
+
+        if (pane === 'single') {
+            outputArea = document.getElementById('output-single');
+            pageInfo = document.getElementById('page-info-single');
+            const paginationControls = document.getElementById('pagination-controls-single');
+            if (extractedKeys.length > itemsPerPage) {
+                paginationControls.classList.remove('hidden');
+            } else {
+                paginationControls.classList.add('hidden');
+            }
+        } else if (pane === 'left') {
+            outputArea = document.getElementById('output-left');
+            pageInfo = document.getElementById('page-info-left');
+        } else if (pane === 'right') {
+            outputArea = document.getElementById('output-right');
+            pageInfo = document.getElementById('page-info-right');
+        }
+
+        const startIndex = page * itemsPerPage;
+        const endIndex = Math.min(startIndex + itemsPerPage, extractedKeys.length);
+        const paginatedData = {};
+        for (let i = startIndex; i < endIndex; i++) {
+            const key = extractedKeys[i];
+            paginatedData[key] = extractedData[key];
+        }
+        outputArea.value = JSON.stringify(paginatedData, null, 2);
+        pageInfo.textContent = `P${page + 1} (${startIndex + 1} - ${endIndex} / ${extractedKeys.length})`;
+    }
+
+    // ビューの切り替え
+    function toggleView() {
+        isDualView = !isDualView;
+        if (isDualView) {
+            // 分割ビューに切り替える際、右側のページを左側の次のページに設定
+            currentPageRight = currentPageLeft + 1;
+            if (currentPageRight * itemsPerPage >= extractedKeys.length) {
+                currentPageRight = 0; // ファイルの最後まで行ったら最初のページに戻る
+            }
+        }
+        displayResults();
+    }
+
+    // ファイル入力の変更イベントをリッスン
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
@@ -195,56 +416,162 @@
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
-                // ファイルの内容をJSONとしてパース
                 const data = JSON.parse(e.target.result);
-                // "Entries"キーまたはルート配列からデータを取得
                 const entries = Array.isArray(data) ? data : (data.Entries || []);
-                extracted = {};
+                extractedData = {};
 
-                // 各エントリをループ処理し、「Value」を抽出
                 entries.forEach(entry => {
                     if (entry.Value) {
-                        extracted[entry.Value] = "";
+                        extractedData[entry.Value] = "";
                     }
                 });
 
-                // 結果を整形してテキストエリアに表示
-                document.getElementById('output').value = JSON.stringify(extracted, null, 2);
+                extractedKeys = Object.keys(extractedData);
+                currentPageSingle = 0;
+                currentPageLeft = 0;
+                currentPageRight = 1;
+                isDualView = false; // 新しいファイルを読み込んだら単一ビューに戻す
+                displayResults();
+
                 showMessage('JSONの抽出が完了しました！', 'success');
             } catch (err) {
-                // JSONパースエラーを処理
                 showMessage('JSONを正しく読み込めませんでした。😢 ファイルが有効なJSON形式であることを確認してね。', 'error');
-                document.getElementById('output').value = '';
+                document.getElementById('output-single').value = '';
+                document.getElementById('dual-view-container').classList.add('hidden');
+                document.getElementById('single-view-container').classList.remove('hidden');
             }
         };
-        // ファイルの内容をテキストとして読み込み
         reader.readAsText(file, "UTF-8");
     });
-
-    // 抽出結果をJSONファイルとしてダウンロードする関数
-    function downloadJSON() {
-        // 抽出されたデータがない場合は警告
-        if (!Object.keys(extracted).length) {
+    
+    // ダウンロード形式選択モーダルを表示する
+    function showDownloadAllModal() {
+        if (extractedKeys.length === 0) {
             showMessage("まだ抽出結果がありません。先にJSONファイルをアップロードしてね！", 'error');
             return;
         }
+        currentDownloadContext = 'all';
+        document.getElementById('downloadModal').classList.add('open');
+    }
 
-        // Blobオブジェクトを作成してダウンロードリンクを生成
-        const blob = new Blob([JSON.stringify(extracted, null, 2)], { type: "application/json" });
+    function showDownloadPaneModal(pane) {
+        let outputValue;
+        if (pane === 'left') {
+            outputValue = document.getElementById('output-left').value;
+        } else if (pane === 'right') {
+            outputValue = document.getElementById('output-right').value;
+        }
+
+        if (!outputValue) {
+            showMessage("プレビューエリアにコンテンツがありません。", 'error');
+            return;
+        }
+
+        currentDownloadContext = pane;
+        document.getElementById('downloadModal').classList.add('open');
+    }
+
+    // JSON形式でダウンロードする
+    document.getElementById('saveAsJsonBtn').addEventListener('click', () => {
+        downloadFile('json');
+        document.getElementById('downloadModal').classList.remove('open');
+    });
+
+    // テキスト形式でダウンロードする
+    document.getElementById('saveAsTextBtn').addEventListener('click', () => {
+        downloadFile('text');
+        document.getElementById('downloadModal').classList.remove('open');
+    });
+
+    // ダウンロードを実行する関数
+    function downloadFile(format) {
+        let content, fileName, mimeType;
+
+        if (currentDownloadContext === 'all') {
+            if (format === 'json') {
+                content = JSON.stringify(extractedData, null, 2);
+                fileName = `extracted_texts_all.json`;
+                mimeType = "application/json";
+            } else { // text
+                content = extractedKeys.map(key => key).join('\n');
+                fileName = `extracted_texts_all.txt`;
+                mimeType = "text/plain";
+            }
+        } else { // pane
+            const outputId = currentDownloadContext === 'left' ? 'output-left' : 'output-right';
+            content = document.getElementById(outputId).value;
+            const pageNum = currentDownloadContext === 'left' ? currentPageLeft : currentPageRight;
+            
+            if (format === 'json') {
+                fileName = `extracted_texts_page_${pageNum + 1}.json`;
+                mimeType = "application/json";
+            } else { // text
+                try {
+                    const jsonData = JSON.parse(content);
+                    const keys = Object.keys(jsonData);
+                    content = keys.join('\n');
+                } catch (e) {
+                    console.error("JSON to text conversion failed.", e);
+                    showMessage("JSONからテキストへの変換に失敗しました。", 'error');
+                    return;
+                }
+                fileName = `extracted_texts_page_${pageNum + 1}.txt`;
+                mimeType = "text/plain";
+            }
+        }
+
+        const blob = new Blob([content], { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "extracted_texts.json";
+        a.download = fileName;
         
-        // 仮想クリックでダウンロードを開始
         document.body.appendChild(a);
         a.click();
         
-        // URLオブジェクトを解放
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         
-        showMessage("JSONファイルのダウンロードを開始しました！", 'success');
+        showMessage(`ファイルを${format}形式でダウンロードしました！`, 'success');
+    }
+
+    // ページネーションの関数
+    function prevPage(pane) {
+        if (pane === 'single') {
+            if (currentPageSingle > 0) {
+                currentPageSingle--;
+                displayPane('single', currentPageSingle);
+            }
+        } else if (pane === 'left') {
+            if (currentPageLeft > 0) {
+                currentPageLeft--;
+                displayPane('left', currentPageLeft);
+            }
+        } else if (pane === 'right') {
+            if (currentPageRight > 0) {
+                currentPageRight--;
+                displayPane('right', currentPageRight);
+            }
+        }
+    }
+    
+    function nextPage(pane) {
+        if (pane === 'single') {
+            if ((currentPageSingle + 1) * itemsPerPage < extractedKeys.length) {
+                currentPageSingle++;
+                displayPane('single', currentPageSingle);
+            }
+        } else if (pane === 'left') {
+            if ((currentPageLeft + 1) * itemsPerPage < extractedKeys.length) {
+                currentPageLeft++;
+                displayPane('left', currentPageLeft);
+            }
+        } else if (pane === 'right') {
+            if ((currentPageRight + 1) * itemsPerPage < extractedKeys.length) {
+                currentPageRight++;
+                displayPane('right', currentPageRight);
+            }
+        }
     }
 
     // 折りたたみパネルのスクリプト
@@ -255,6 +582,27 @@
         const isOpen = collapsibleHeader.classList.toggle('open');
         collapsibleContent.style.display = isOpen ? 'block' : 'none';
     });
+    
+    // ブックマークレットパネルのスクリプト
+    const bookmarkletHeader = document.getElementById('bookmarkletHeader');
+    const bookmarkletContent = document.getElementById('bookmarkletContent');
+    const bookmarkletCodeArea = document.getElementById('bookmarkletCode');
+    
+    bookmarkletCodeArea.value = bookmarkletCode;
+
+    bookmarkletHeader.addEventListener('click', () => {
+        bookmarkletContent.classList.toggle('hidden');
+    });
+
+    function copyBookmarklet() {
+        const tempInput = document.createElement('textarea');
+        tempInput.value = bookmarkletCode;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        showMessage('ブックマークレットコードをクリップボードにコピーしました！', 'success');
+    }
 </script>
 </body>
 </html>
