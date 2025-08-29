@@ -4,10 +4,6 @@ The Sims 4 の翻訳ファイル（JSON）を、AIと連携しながら自然な
 タグを壊さず、繰り返し使える置換辞書の作成と適用が簡単にできます。
 
 ツールはこちら🌐<a href="https://nonamesims4.github.io/Sims4JSON-AI-/" target="_blank" rel="noopener">※新しいタブで開きたい場合は Ctrl+クリック（MacはCmd+クリック）してください</a>  
-<a href="https://nonamesims4.github.io/Sims4JSON-AI-/sims4json.html"
-   target="_blank" rel="noopener noreferrer">
-  テスト用ツール
-</a>  
 
 
 
