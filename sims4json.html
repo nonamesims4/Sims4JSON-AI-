@@ -114,7 +114,7 @@
     <div class="bg-gray-800 bg-opacity-80 p-8 rounded-3xl shadow-2xl w-full max-w-4xl backdrop-blur-sm">
         <h1 class="text-xl font-extrabold mb-4 text-center text-teal-400">✨ Sims4Translator専用置き換え辞書ベース作成ツール ✨</h1>
         <p class="text-sm text-gray-300 mb-6 text-center">
-            Sims4TranslatorからエクスポートしたJSONファイルをアップロードしてね！「Value」だけを抜き出して、<code class="bg-gray-700 text-gray-200 p-1 rounded-md">{ "原文": "" }</code> の形式に自動で変換するよ。
+            Sims4TranslatorからエクスポートしたJSONファイルや、任意のキーと値を持つJSONファイルをアップロードしてね！原文（"Value"またはキー）だけを抜き出して、<code class="bg-gray-700 text-gray-200 p-1 rounded-md">{ "原文": "" }</code> の形式に自動で変換するよ。
         </p>
         
         <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
@@ -274,8 +274,8 @@
         </div>
 
         <!-- ダウンロード形式選択用モーダル -->
-        <div id="downloadModal" class="modal">
-            <div class="modal-content">
+        <div id="downloadModal" class="modal" onclick="closeModal(event)">
+            <div class="modal-content" onclick="event.stopPropagation()">
                 <h4 class="font-bold mb-4">保存形式を選択</h4>
                 <div class="flex flex-col space-y-4">
                     <button id="saveAsJsonBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg">
@@ -365,7 +365,7 @@
 
     // 特定のプレビューエリアに結果を表示する関数
     function displayPane(pane, page) {
-        let outputArea, pageInfo, prevButton, nextButton;
+        let outputArea, pageInfo;
 
         if (pane === 'single') {
             outputArea = document.getElementById('output-single');
@@ -417,14 +417,47 @@
         reader.onload = function(e) {
             try {
                 const data = JSON.parse(e.target.result);
-                const entries = Array.isArray(data) ? data : (data.Entries || []);
                 extractedData = {};
+                let extractionSuccess = false;
 
-                entries.forEach(entry => {
-                    if (entry.Value) {
-                        extractedData[entry.Value] = "";
+                // Case 1: Sims4Translator format check (`Entries` array with `Value`)
+                if (data && data.Entries && Array.isArray(data.Entries)) {
+                    data.Entries.forEach(entry => {
+                        if (entry.Value) {
+                            extractedData[entry.Value] = "";
+                        }
+                    });
+                    extractionSuccess = true;
+                    showMessage('Sims4Translator形式のJSONから抽出が完了しました！', 'success');
+                }
+                // Case 2: General array of objects with `value` property
+                else if (data && Array.isArray(data) && data.every(item => item.hasOwnProperty('value'))) {
+                    data.forEach(item => {
+                        if (item.value) {
+                            extractedData[item.value] = "";
+                        }
+                    });
+                    extractionSuccess = true;
+                    showMessage('一般的なJSON配列から抽出が完了しました！', 'success');
+                }
+                // Case 3: Generic object format (keys and values)
+                else if (data && typeof data === 'object' && !Array.isArray(data)) {
+                    for (const key in data) {
+                        if (Object.prototype.hasOwnProperty.call(data, key)) {
+                            // キーが文字列の場合のみ抽出
+                            if (typeof key === 'string' && key) {
+                                extractedData[key] = "";
+                            }
+                        }
                     }
-                });
+                    extractionSuccess = true;
+                    showMessage('一般的なJSONオブジェクトから抽出が完了しました！', 'success');
+                }
+                
+                if (!extractionSuccess) {
+                    extractedData = {};
+                    showMessage('JSONを正しく読み込めませんでした。😢 ファイルが有効なJSON形式であることを確認してね。', 'error');
+                }
 
                 extractedKeys = Object.keys(extractedData);
                 currentPageSingle = 0;
@@ -433,7 +466,6 @@
                 isDualView = false; // 新しいファイルを読み込んだら単一ビューに戻す
                 displayResults();
 
-                showMessage('JSONの抽出が完了しました！', 'success');
             } catch (err) {
                 showMessage('JSONを正しく読み込めませんでした。😢 ファイルが有効なJSON形式であることを確認してね。', 'error');
                 document.getElementById('output-single').value = '';
@@ -483,6 +515,12 @@
         document.getElementById('downloadModal').classList.remove('open');
     });
 
+    function closeModal(event) {
+        if (event.target.id === 'downloadModal') {
+            document.getElementById('downloadModal').classList.remove('open');
+        }
+    }
+
     // ダウンロードを実行する関数
     function downloadFile(format) {
         let content, fileName, mimeType;
@@ -499,17 +537,18 @@
             }
         } else { // pane
             const outputId = currentDownloadContext === 'left' ? 'output-left' : 'output-right';
-            content = document.getElementById(outputId).value;
             const pageNum = currentDownloadContext === 'left' ? currentPageLeft : currentPageRight;
-            
+            const outputValue = document.getElementById(outputId).value;
+
             if (format === 'json') {
+                content = outputValue;
                 fileName = `extracted_texts_page_${pageNum + 1}.json`;
                 mimeType = "application/json";
             } else { // text
                 try {
-                    const jsonData = JSON.parse(content);
-                    const keys = Object.keys(jsonData);
-                    content = keys.join('\n');
+                    const jsonData = JSON.parse(outputValue);
+                    const values = Object.keys(jsonData);
+                    content = values.join('\n');
                 } catch (e) {
                     console.error("JSON to text conversion failed.", e);
                     showMessage("JSONからテキストへの変換に失敗しました。", 'error');
