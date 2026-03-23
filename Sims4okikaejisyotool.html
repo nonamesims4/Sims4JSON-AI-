@@ -4,47 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sims 4 プロ翻訳ツール v3.2</title>
-    <!-- React & Babel -->
+    <!-- 必要なライブラリをCDNから読み込み -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
+    <!-- Lucide Icons (アイコン用) -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .font-monospace { font-family: 'Courier New', Courier, monospace; }
+        body { 
+            font-family: 'Inter', 'sans-serif'; 
+            background-color: #020617; /* slate-950 */
+        }
+        .font-monospace { font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'; }
+        /* スクロールバーのカスタマイズ */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-200">
+<body>
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
-        
-        // Lucide Icon Component Wrapper
-        const Icon = ({ name, size = 18, className = "" }) => {
-            const [svg, setSvg] = useState("");
-            useEffect(() => {
-                const icon = lucide.icons[name];
-                if (icon) {
-                    const svgString = lucide.createIcons({
-                        icons: { [name]: icon },
-                        attrs: { width: size, height: size, class: className }
-                    });
-                }
-                // Fallback for simple usage in script tag
-                if (window.lucide) window.lucide.createIcons();
-            }, [name, size, className]);
-            
-            return <i data-lucide={name} style={{width: size, height: size}} className={className}></i>;
-        };
 
+        // 定数設定
         const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
         const CHUNK_SIZE = 30;
-        const apiKey = ""; // API key is handled by the environment at runtime
+        const apiKey = ""; // 実行時に環境から供給されます
 
         const SYSTEM_PROMPT = `あなたは The Sims 4 に特化したプロのゲーム翻訳者です。
 前後の文脈を推測し、すべてのテキストを日本語に翻訳してください。
@@ -56,7 +46,7 @@
 - 「Summon {2.SimFirstName}」→「{2.SimFirstName}を召喚する」のように、短いシステム文も必ず翻訳すること。
 
 # お手本スタイル（厳守）
-- 魔法的な表現: 「祭器（アサメイ）」「苦悶」「神聖エネルギー」「慈悲深くも」など。
+- 魔法的表現: 「祭器（アサメイ）」「苦悶」「神聖エネルギー」「慈悲深くも」など。
 - タグ処理: '{M0.HE}{F0.SHE}' -> '{M0.彼}{F0.彼女}'。
 - タグと助詞の結合: 「{0.SimFirstName}は」「{M0.彼}{F0.彼女}の」など。
 - 二重助詞の防止: 「彼のの」→「彼の」に修正。
@@ -70,11 +60,14 @@
             const [translatedData, setTranslatedData] = useState({});
             const [isRunning, setIsRunning] = useState(false);
             const [progress, setProgress] = useState(0);
-            const [logs, setLogs] = useState([{ msg: "待機中... 英語が残っているJSONを読み込んでもOKです。", type: "info", time: new Date().toLocaleTimeString() }]);
+            const [logs, setLogs] = useState([{ msg: "待機中... 英語残りがあるファイルも再翻訳可能です。", type: "info", time: new Date().toLocaleTimeString() }]);
             const stopRef = useRef(false);
 
+            // Lucideアイコンの初期化
             useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
             }, [logs, progress, isRunning]);
 
             const addLog = (msg, type = "info") => {
@@ -92,7 +85,7 @@
                         const json = JSON.parse(text);
                         Object.assign(combined, json);
                     } catch (err) {
-                        addLog(`${file.name} の読み取りに失敗しました。`, "error");
+                        addLog(`${file.name} の読み込みに失敗しました。`, "error");
                     }
                 }
                 setSourceData(combined);
@@ -129,7 +122,7 @@
             const startTranslation = async () => {
                 setIsRunning(true);
                 stopRef.current = false;
-                addLog("翻訳プロセスを開始します。");
+                addLog("翻訳プロセスを開始します。未翻訳箇所を徹底修正します。");
 
                 const allKeys = Object.keys(sourceData);
                 const total = allKeys.length;
@@ -137,7 +130,7 @@
 
                 for (let i = 0; i < total; i += CHUNK_SIZE) {
                     if (stopRef.current) {
-                        addLog("一時停止しました。");
+                        addLog("ユーザーにより停止されました。");
                         break;
                     }
 
@@ -149,11 +142,11 @@
                         const result = await translateChunk(chunk);
                         Object.assign(currentTranslated, result);
                         setTranslatedData({ ...currentTranslated });
-                        const doneCount = Object.keys(currentTranslated).length;
-                        setProgress(Math.floor((doneCount / total) * 100));
-                        addLog(`${doneCount} / ${total} 件完了`);
+                        const currentCount = Object.keys(currentTranslated).length;
+                        setProgress(Math.floor((currentCount / total) * 100));
+                        addLog(`${currentCount} / ${total} 件の処理を完了`);
                     } catch (err) {
-                        addLog(`エラー: ${err.message}`, "error");
+                        addLog(`エラーが発生しました: ${err.message}`, "error");
                         break;
                     }
                 }
@@ -167,42 +160,45 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `translated_fixed_${new Date().getTime()}.json`;
+                a.download = `sims4_fixed_translation_${new Date().getTime()}.json`;
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             };
 
             return (
-                <div className="min-h-screen p-4 md:p-8">
+                <div className="min-h-screen text-slate-200 p-4 md:p-8">
                     <div className="max-w-4xl mx-auto space-y-6">
                         <header className="text-center space-y-2">
                             <h1 className="text-3xl font-bold text-violet-400">Sims 4 プロ翻訳ツール v3.2</h1>
-                            <p className="text-slate-400 text-sm">GitHub保存用 スタンドアロンHTML版</p>
+                            <p className="text-slate-400 text-sm">英語残りを許さない、徹底日本語化エディション</p>
                         </header>
 
-                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                        {/* メイン操作パネル */}
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
                             <div className="flex flex-wrap gap-4 items-center">
-                                <label className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg cursor-pointer transition">
-                                    <i data-lucide="file-json" className="text-violet-400"></i>
-                                    <span>JSONを読込</span>
+                                <label className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg cursor-pointer transition text-sm">
+                                    <i data-lucide="file-json" className="text-violet-400 w-5 h-5"></i>
+                                    <span>JSONを選択</span>
                                     <input type="file" className="hidden" accept=".json" multiple onChange={handleFileUpload} />
                                 </label>
 
                                 <button 
                                     onClick={startTranslation}
                                     disabled={isRunning || Object.keys(sourceData).length === 0}
-                                    className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 px-6 py-2 rounded-lg font-bold transition text-white"
+                                    className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-30 px-6 py-2 rounded-lg font-bold transition text-white"
                                 >
-                                    {isRunning ? <i data-lucide="loader-2" className="animate-spin"></i> : <i data-lucide="play"></i>}
+                                    {isRunning ? <i data-lucide="loader-2" className="animate-spin w-5 h-5"></i> : <i data-lucide="play" className="w-5 h-5"></i>}
                                     開始
                                 </button>
 
                                 <button 
                                     onClick={() => stopRef.current = true}
                                     disabled={!isRunning}
-                                    className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition"
+                                    className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 px-4 py-2 rounded-lg transition"
                                 >
-                                    <i data-lucide="pause"></i>
+                                    <i data-lucide="pause" className="w-5 h-5"></i>
                                     停止
                                 </button>
 
@@ -211,55 +207,68 @@
                                         <span>進捗: {progress}%</span>
                                         <span>{Object.keys(translatedData).length} / {Object.keys(sourceData).length}</span>
                                     </div>
-                                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-violet-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+                                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                                        <div className="h-full bg-gradient-to-r from-violet-600 to-fuchsia-500 transition-all duration-300" style={{ width: `${progress}%` }} />
                                     </div>
                                 </div>
                             </div>
                         </div>
 
+                        {/* ログ & 情報 */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col h-[400px]">
-                                <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                            <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col h-[450px] shadow-lg">
+                                <div className="p-4 border-b border-slate-800 bg-slate-900/80 flex justify-between items-center">
                                     <h3 className="font-bold flex items-center gap-2">
-                                        <i data-lucide="chevron-right" className="text-violet-400"></i>
-                                        実行ログ
+                                        <i data-lucide="terminal" className="text-violet-400 w-5 h-5"></i>
+                                        リアルタイム・ログ
                                     </h3>
                                     <button 
                                         onClick={downloadJson}
                                         disabled={Object.keys(translatedData).length === 0}
-                                        className="flex items-center gap-2 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-3 py-1 rounded-md font-bold transition text-white"
+                                        className="flex items-center gap-2 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 px-3 py-1.5 rounded-md font-bold transition text-white"
                                     >
-                                        <i data-lucide="download" size="14"></i>
-                                        保存
+                                        <i data-lucide="download" className="w-4 h-4"></i>
+                                        結果を保存
                                     </button>
                                 </div>
-                                <div className="flex-grow overflow-y-auto p-4 space-y-2 font-monospace text-sm text-slate-300">
+                                <div className="flex-grow overflow-y-auto p-4 space-y-2 font-monospace text-xs leading-relaxed">
                                     {logs.map((log, i) => (
-                                        <div key={i} className={`flex gap-2 ${log.type === 'error' ? 'text-rose-400' : log.type === 'success' ? 'text-emerald-400' : 'text-slate-400'}`}>
-                                            <span className="opacity-50">[{log.time}]</span>
-                                            <span>{log.msg}</span>
+                                        <div key={i} className={`flex gap-2 p-1 rounded ${log.type === 'error' ? 'bg-rose-500/10 text-rose-300' : log.type === 'success' ? 'bg-emerald-500/10 text-emerald-300' : 'text-slate-400'}`}>
+                                            <span className="opacity-40 shrink-0">[{log.time}]</span>
+                                            <span className="break-all">{log.msg}</span>
                                         </div>
                                     ))}
+                                    {logs.length === 0 && <div className="text-slate-600 italic text-center mt-10">ログはありません</div>}
                                 </div>
                             </div>
 
-                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                                <h3 className="font-bold border-b border-slate-800 pb-2">翻訳ヒント</h3>
-                                <ul className="text-xs space-y-3 text-slate-400">
-                                    <li className="flex gap-2">
-                                        <i data-lucide="check-circle-2" className="text-emerald-500 shrink-0"></i>
-                                        <span>英語が混じったJSONをそのまま読み込んで再実行できます。</span>
-                                    </li>
-                                    <li className="flex gap-2">
-                                        <i data-lucide="check-circle-2" className="text-emerald-500 shrink-0"></i>
-                                        <span>短いシステム語も日本語化します。</span>
-                                    </li>
-                                    <li className="flex gap-2">
-                                        <i data-lucide="alert-circle" className="text-amber-500 shrink-0"></i>
-                                        <span>GitHubで公開する場合、このHTMLファイルをリポジトリに入れてください。</span>
-                                    </li>
-                                </ul>
+                            <div className="space-y-6">
+                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-lg">
+                                    <h3 className="font-bold border-b border-slate-800 pb-2 text-sm flex items-center gap-2">
+                                        <i data-lucide="help-circle" className="text-violet-400 w-4 h-4"></i>
+                                        使い方
+                                    </h3>
+                                    <ul className="text-xs space-y-3 text-slate-400">
+                                        <li className="flex gap-2">
+                                            <i data-lucide="check" className="text-emerald-500 w-4 h-4 shrink-0"></i>
+                                            <span>一度翻訳して英語が残ったファイルを再投入すると、そこだけ綺麗に日本語化します。</span>
+                                        </li>
+                                        <li className="flex gap-2">
+                                            <i data-lucide="check" className="text-emerald-500 w-4 h-4 shrink-0"></i>
+                                            <span>「召喚する」「到着」などの単語も、ゲームの文脈で翻訳します。</span>
+                                        </li>
+                                        <li className="flex gap-2">
+                                            <i data-lucide="info" className="text-blue-400 w-4 h-4 shrink-0"></i>
+                                            <span>GitHub Pagesなどで公開すると、スマホからも利用可能です。</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                
+                                <div className="bg-gradient-to-br from-violet-900/20 to-slate-900 border border-violet-500/20 rounded-2xl p-5 shadow-lg">
+                                    <p className="text-[10px] text-slate-500 leading-tight">
+                                        ※このツールはブラウザ上で動作します。サーバーにデータが送信されることはありません（Gemini APIへのリクエストを除く）。
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
