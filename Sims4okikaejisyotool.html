@@ -1,15 +1,52 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot } from 'firebase/firestore';
-import { Loader2, FileJson, Play, Pause, Download, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sims 4 プロ翻訳ツール v3.2</title>
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .font-monospace { font-family: 'Courier New', Courier, monospace; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+    <div id="root"></div>
 
-// --- Configuration & Constants ---
-const apiKey = ""; // API key is handled by the environment
-const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
-const CHUNK_SIZE = 30;
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+        
+        // Lucide Icon Component Wrapper
+        const Icon = ({ name, size = 18, className = "" }) => {
+            const [svg, setSvg] = useState("");
+            useEffect(() => {
+                const icon = lucide.icons[name];
+                if (icon) {
+                    const svgString = lucide.createIcons({
+                        icons: { [name]: icon },
+                        attrs: { width: size, height: size, class: className }
+                    });
+                }
+                // Fallback for simple usage in script tag
+                if (window.lucide) window.lucide.createIcons();
+            }, [name, size, className]);
+            
+            return <i data-lucide={name} style={{width: size, height: size}} className={className}></i>;
+        };
 
-const SYSTEM_PROMPT = `あなたは The Sims 4 に特化したプロのゲーム翻訳者です。
+        const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+        const CHUNK_SIZE = 30;
+        const apiKey = ""; // API key is handled by the environment at runtime
+
+        const SYSTEM_PROMPT = `あなたは The Sims 4 に特化したプロのゲーム翻訳者です。
 前後の文脈を推測し、すべてのテキストを日本語に翻訳してください。
 【重要】英語がそのまま残ることは絶対に避けてください。たとえ1単語でも必ず日本語にします。
 
@@ -19,7 +56,7 @@ const SYSTEM_PROMPT = `あなたは The Sims 4 に特化したプロのゲーム
 - 「Summon {2.SimFirstName}」→「{2.SimFirstName}を召喚する」のように、短いシステム文も必ず翻訳すること。
 
 # お手本スタイル（厳守）
-- 魔法的表現: 「祭器（アサメイ）」「苦悶」「神聖エネルギー」「慈悲深くも」など。
+- 魔法的な表現: 「祭器（アサメイ）」「苦悶」「神聖エネルギー」「慈悲深くも」など。
 - タグ処理: '{M0.HE}{F0.SHE}' -> '{M0.彼}{F0.彼女}'。
 - タグと助詞の結合: 「{0.SimFirstName}は」「{M0.彼}{F0.彼女}の」など。
 - 二重助詞の防止: 「彼のの」→「彼の」に修正。
@@ -28,213 +65,210 @@ const SYSTEM_PROMPT = `あなたは The Sims 4 に特化したプロのゲーム
 必ず有効なJSON形式で返してください。キーは原文のまま、値のみを翻訳後の日本語にします。
 未翻訳の項目を絶対に作らないでください。`;
 
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [sourceData, setSourceData] = useState({});
-  const [translatedData, setTranslatedData] = useState({});
-  const [isRunning, setIsRunning] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [logs, setLogs] = useState([{ msg: "待機中... 英語が残っているJSONを読み込んでもOKです。", type: "info" }]);
-  const stopRef = useRef(false);
+        function App() {
+            const [sourceData, setSourceData] = useState({});
+            const [translatedData, setTranslatedData] = useState({});
+            const [isRunning, setIsRunning] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [logs, setLogs] = useState([{ msg: "待機中... 英語が残っているJSONを読み込んでもOKです。", type: "info", time: new Date().toLocaleTimeString() }]);
+            const stopRef = useRef(false);
 
-  // --- Helpers ---
-  const addLog = (msg, type = "info") => {
-    setLogs(prev => [{ msg, type, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
-  };
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [logs, progress, isRunning]);
 
-  const updateProgress = (done, total) => {
-    setProgress(Math.floor((done / total) * 100));
-  };
+            const addLog = (msg, type = "info") => {
+                setLogs(prev => [{ msg, type, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
+            };
 
-  // --- File Handling ---
-  const handleFileUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
+            const handleFileUpload = async (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
 
-    let combined = {};
-    for (const file of files) {
-      try {
-        const text = await file.text();
-        const json = JSON.parse(text);
-        Object.assign(combined, json);
-      } catch (err) {
-        addLog(`${file.name} の読み込みに失敗しました。`, "error");
-      }
-    }
-    setSourceData(combined);
-    setTranslatedData({});
-    addLog(`${Object.keys(combined).length} 件のデータを読み込みました。`, "success");
-  };
+                let combined = {};
+                for (const file of files) {
+                    try {
+                        const text = await file.text();
+                        const json = JSON.parse(text);
+                        Object.assign(combined, json);
+                    } catch (err) {
+                        addLog(`${file.name} の読み取りに失敗しました。`, "error");
+                    }
+                }
+                setSourceData(combined);
+                setTranslatedData({});
+                addLog(`${Object.keys(combined).length} 件のデータを読み込みました。`, "success");
+            };
 
-  // --- API Logic ---
-  const translateChunk = async (chunk) => {
-    let delay = 1000;
-    for (let i = 0; i < 5; i++) {
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: JSON.stringify(chunk) }] }],
-            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            generationConfig: { responseMimeType: "application/json" }
-          })
-        });
+            const translateChunk = async (chunk) => {
+                let delay = 1000;
+                for (let i = 0; i < 5; i++) {
+                    try {
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: JSON.stringify(chunk) }] }],
+                                systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+                                generationConfig: { responseMimeType: "application/json" }
+                            })
+                        });
 
-        if (!response.ok) throw new Error(`API Error: ${response.status}`);
-        const result = await response.json();
-        const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-        return JSON.parse(text);
-      } catch (err) {
-        if (i === 4) throw err;
-        await new Promise(r => setTimeout(r, delay));
-        delay *= 2;
-      }
-    }
-  };
+                        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                        const result = await response.json();
+                        const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                        return JSON.parse(text);
+                    } catch (err) {
+                        if (i === 4) throw err;
+                        await new Promise(r => setTimeout(r, delay));
+                        delay *= 2;
+                    }
+                }
+            };
 
-  const startTranslation = async () => {
-    setIsRunning(true);
-    stopRef.current = false;
-    addLog("翻訳プロセスを開始します。英語の残りを徹底的に日本語化します。");
+            const startTranslation = async () => {
+                setIsRunning(true);
+                stopRef.current = false;
+                addLog("翻訳プロセスを開始します。");
 
-    const allKeys = Object.keys(sourceData);
-    const total = allKeys.length;
-    let currentTranslated = { ...translatedData };
+                const allKeys = Object.keys(sourceData);
+                const total = allKeys.length;
+                let currentTranslated = { ...translatedData };
 
-    for (let i = 0; i < total; i += CHUNK_SIZE) {
-      if (stopRef.current) {
-        addLog("一時停止しました。");
-        break;
-      }
+                for (let i = 0; i < total; i += CHUNK_SIZE) {
+                    if (stopRef.current) {
+                        addLog("一時停止しました。");
+                        break;
+                    }
 
-      const chunkKeys = allKeys.slice(i, i + CHUNK_SIZE);
-      const chunk = {};
-      chunkKeys.forEach(k => chunk[k] = sourceData[k]);
+                    const chunkKeys = allKeys.slice(i, i + CHUNK_SIZE);
+                    const chunk = {};
+                    chunkKeys.forEach(k => chunk[k] = sourceData[k]);
 
-      try {
-        const result = await translateChunk(chunk);
-        Object.assign(currentTranslated, result);
-        setTranslatedData({ ...currentTranslated });
-        updateProgress(Object.keys(currentTranslated).length, total);
-        addLog(`${Math.min(i + CHUNK_SIZE, total)} / ${total} 件完了`);
-      } catch (err) {
-        addLog(`エラー: ${err.message}`, "error");
-        break;
-      }
-    }
+                    try {
+                        const result = await translateChunk(chunk);
+                        Object.assign(currentTranslated, result);
+                        setTranslatedData({ ...currentTranslated });
+                        const doneCount = Object.keys(currentTranslated).length;
+                        setProgress(Math.floor((doneCount / total) * 100));
+                        addLog(`${doneCount} / ${total} 件完了`);
+                    } catch (err) {
+                        addLog(`エラー: ${err.message}`, "error");
+                        break;
+                    }
+                }
 
-    setIsRunning(false);
-    addLog("すべての処理が完了しました。", "success");
-  };
+                setIsRunning(false);
+                addLog("すべての処理が完了しました。", "success");
+            };
 
-  const downloadJson = () => {
-    const blob = new Blob([JSON.stringify(translatedData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `translated_fixed_${new Date().getTime()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+            const downloadJson = () => {
+                const blob = new Blob([JSON.stringify(translatedData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `translated_fixed_${new Date().getTime()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 font-sans">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <header className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-violet-400">Sims 4 プロ翻訳ツール v3.2</h1>
-          <p className="text-slate-400 text-sm">英語の残りを検出し、プロの文体で再翻訳します</p>
-        </header>
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-4xl mx-auto space-y-6">
+                        <header className="text-center space-y-2">
+                            <h1 className="text-3xl font-bold text-violet-400">Sims 4 プロ翻訳ツール v3.2</h1>
+                            <p className="text-slate-400 text-sm">GitHub保存用 スタンドアロンHTML版</p>
+                        </header>
 
-        {/* Status Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-          <div className="flex flex-wrap gap-4 items-center">
-            <label className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg cursor-pointer transition">
-              <FileJson size={18} className="text-violet-400" />
-              <span>JSONを読込</span>
-              <input type="file" className="hidden" accept=".json" multiple onChange={handleFileUpload} />
-            </label>
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                            <div className="flex flex-wrap gap-4 items-center">
+                                <label className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg cursor-pointer transition">
+                                    <i data-lucide="file-json" className="text-violet-400"></i>
+                                    <span>JSONを読込</span>
+                                    <input type="file" className="hidden" accept=".json" multiple onChange={handleFileUpload} />
+                                </label>
 
-            <button 
-              onClick={startTranslation}
-              disabled={isRunning || Object.keys(sourceData).length === 0}
-              className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 px-6 py-2 rounded-lg font-bold transition"
-            >
-              {isRunning ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
-              開始
-            </button>
+                                <button 
+                                    onClick={startTranslation}
+                                    disabled={isRunning || Object.keys(sourceData).length === 0}
+                                    className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 px-6 py-2 rounded-lg font-bold transition text-white"
+                                >
+                                    {isRunning ? <i data-lucide="loader-2" className="animate-spin"></i> : <i data-lucide="play"></i>}
+                                    開始
+                                </button>
 
-            <button 
-              onClick={() => stopRef.current = true}
-              disabled={!isRunning}
-              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition"
-            >
-              <Pause size={18} />
-              停止
-            </button>
+                                <button 
+                                    onClick={() => stopRef.current = true}
+                                    disabled={!isRunning}
+                                    className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition"
+                                >
+                                    <i data-lucide="pause"></i>
+                                    停止
+                                </button>
 
-            <div className="flex-grow min-w-[200px]">
-              <div className="flex justify-between text-xs mb-1 text-slate-400">
-                <span>進捗: {progress}%</span>
-                <span>{Object.keys(translatedData).length} / {Object.keys(sourceData).length}</span>
-              </div>
-              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-violet-500 transition-all duration-300" style={{ width: `${progress}%` }} />
-              </div>
-            </div>
-          </div>
-        </div>
+                                <div className="flex-grow min-w-[200px]">
+                                    <div className="flex justify-between text-xs mb-1 text-slate-400">
+                                        <span>進捗: {progress}%</span>
+                                        <span>{Object.keys(translatedData).length} / {Object.keys(sourceData).length}</span>
+                                    </div>
+                                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                        <div className="h-full bg-violet-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-        {/* Results & Download */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col h-[400px]">
-            <div className="p-4 border-bottom border-slate-800 bg-slate-900/50 flex justify-between items-center">
-              <h3 className="font-bold flex items-center gap-2">
-                <ChevronRight size={18} className="text-violet-400" />
-                実行ログ
-              </h3>
-              <button 
-                onClick={downloadJson}
-                disabled={Object.keys(translatedData).length === 0}
-                className="flex items-center gap-2 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-3 py-1 rounded-md font-bold transition"
-              >
-                <Download size={14} />
-                保存
-              </button>
-            </div>
-            <div className="flex-grow overflow-y-auto p-4 space-y-2 font-monospace text-sm">
-              {logs.map((log, i) => (
-                <div key={i} className={`flex gap-2 ${log.type === 'error' ? 'text-rose-400' : log.type === 'success' ? 'text-emerald-400' : 'text-slate-400'}`}>
-                  <span className="opacity-50">[{log.time}]</span>
-                  <span>{log.msg}</span>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col h-[400px]">
+                                <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                                    <h3 className="font-bold flex items-center gap-2">
+                                        <i data-lucide="chevron-right" className="text-violet-400"></i>
+                                        実行ログ
+                                    </h3>
+                                    <button 
+                                        onClick={downloadJson}
+                                        disabled={Object.keys(translatedData).length === 0}
+                                        className="flex items-center gap-2 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-3 py-1 rounded-md font-bold transition text-white"
+                                    >
+                                        <i data-lucide="download" size="14"></i>
+                                        保存
+                                    </button>
+                                </div>
+                                <div className="flex-grow overflow-y-auto p-4 space-y-2 font-monospace text-sm text-slate-300">
+                                    {logs.map((log, i) => (
+                                        <div key={i} className={`flex gap-2 ${log.type === 'error' ? 'text-rose-400' : log.type === 'success' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                            <span className="opacity-50">[{log.time}]</span>
+                                            <span>{log.msg}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+                                <h3 className="font-bold border-b border-slate-800 pb-2">翻訳ヒント</h3>
+                                <ul className="text-xs space-y-3 text-slate-400">
+                                    <li className="flex gap-2">
+                                        <i data-lucide="check-circle-2" className="text-emerald-500 shrink-0"></i>
+                                        <span>英語が混じったJSONをそのまま読み込んで再実行できます。</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <i data-lucide="check-circle-2" className="text-emerald-500 shrink-0"></i>
+                                        <span>短いシステム語も日本語化します。</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <i data-lucide="alert-circle" className="text-amber-500 shrink-0"></i>
+                                        <span>GitHubで公開する場合、このHTMLファイルをリポジトリに入れてください。</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-              ))}
-            </div>
-          </div>
+            );
+        }
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-            <h3 className="font-bold border-b border-slate-800 pb-2">翻訳ヒント</h3>
-            <ul className="text-xs space-y-3 text-slate-400">
-              <li className="flex gap-2">
-                <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-                <span>英語が混じったJSONをそのまま読み込んで再実行できます。</span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-                <span>「召喚する」「到着」などのシステム語も日本語化します。</span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-                <span>タグの後の助詞（は、が、の等）を自然に繋げます。</span>
-              </li>
-              <li className="flex gap-2">
-                <AlertCircle size={14} className="text-amber-500 shrink-0" />
-                <span>保存ボタンは1件でも翻訳が完了すると有効になります。</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
