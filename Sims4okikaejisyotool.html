@@ -1,90 +1,17 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sims 4 AI 翻訳プロツール v3.1</title>
-    <style>
-        :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --accent: #8b5cf6;
-            --success: #10b981;
-            --err: #ef4444;
-            --text: #f1f5f9;
-            --muted: #94a3b8;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
-        .container { max-width: 900px; margin: 0 auto; }
-        
-        header { text-align: center; margin-bottom: 25px; }
-        h1 { color: var(--accent); margin-bottom: 5px; }
-        .status-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; background: var(--card); padding: 15px; border-radius: 12px; border: 1px solid #334155; }
-        
-        .btn { padding: 10px 18px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
-        .btn-primary { background: var(--accent); color: white; }
-        .btn-success { background: var(--success); color: white; }
-        .btn-outline { background: transparent; border: 1px solid #475569; color: var(--text); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+import React, { useState, useEffect, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot } from 'firebase/firestore';
+import { Loader2, FileJson, Play, Pause, Download, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
 
-        .progress-container { flex-grow: 1; height: 10px; background: #334155; border-radius: 5px; overflow: hidden; position: relative; }
-        .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; }
+// --- Configuration & Constants ---
+const apiKey = ""; // API key is handled by the environment
+const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+const CHUNK_SIZE = 30;
 
-        .log-container { background: #000; color: #adff2f; font-family: monospace; padding: 15px; border-radius: 8px; height: 200px; overflow-y: auto; font-size: 0.85rem; margin-bottom: 20px; border: 1px solid #334155; }
-        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px; }
-        .log-err { color: var(--err); }
-        .log-ok { color: var(--success); }
-
-        .translation-preview { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid #334155; }
-        .preview-header { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
-        
-        #fileInput { display: none; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <header>
-        <h1>Sims 4 AI 翻訳プロツール v3.1</h1>
-        <p style="color:var(--muted)">英語の残りを徹底排除 ＆ プロスタイル維持</p>
-    </header>
-
-    <div class="status-bar">
-        <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">📁 JSONを一括読込</button>
-        <input type="file" id="fileInput" accept=".json" multiple>
-        
-        <button id="startBtn" class="btn btn-primary" disabled>▶ 翻訳開始</button>
-        <button id="stopBtn" class="btn btn-outline" disabled>Stop</button>
-        
-        <div class="progress-container">
-            <div id="progressBar" class="progress-bar"></div>
-        </div>
-        <div id="percentText" style="min-width: 45px; text-align: right; font-weight: bold;">0%</div>
-    </div>
-
-    <div class="log-container" id="log">
-        <div class="log-entry">システム待機中... JSONファイルを読み込んでください。</div>
-    </div>
-
-    <div class="translation-preview">
-        <div class="preview-header">
-            <h3>翻訳進捗状況</h3>
-            <button id="downloadBtn" class="btn btn-success" disabled>⬇ 結合してダウンロード</button>
-        </div>
-        <div id="stats">
-            読込済み: <span id="countTotal">0</span> 件 / 完了: <span id="countDone">0</span> / 残り: <span id="countLeft">0</span>
-        </div>
-    </div>
-</div>
-
-<script>
-    const apiKey = ""; 
-    const CHUNK_SIZE = 30; // 確実性を高めるために少し小さく
-
-    const SYSTEM_PROMPT = `あなたは The Sims 4 に特化したプロのゲーム翻訳者です。
+const SYSTEM_PROMPT = `あなたは The Sims 4 に特化したプロのゲーム翻訳者です。
 前後の文脈を推測し、すべてのテキストを日本語に翻訳してください。
-英語がそのまま残ることは避けてください。
+【重要】英語がそのまま残ることは絶対に避けてください。たとえ1単語でも必ず日本語にします。
 
 # 翻訳方針
 - 自然な日本語。UIは簡潔に、セリフは口語的に。
@@ -92,7 +19,7 @@
 - 「Summon {2.SimFirstName}」→「{2.SimFirstName}を召喚する」のように、短いシステム文も必ず翻訳すること。
 
 # お手本スタイル（厳守）
-- 魔法的な表現: 「祭器（アサメイ）」「苦悶」「神聖エネルギー」「慈悲深くも」など。
+- 魔法的表現: 「祭器（アサメイ）」「苦悶」「神聖エネルギー」「慈悲深くも」など。
 - タグ処理: '{M0.HE}{F0.SHE}' -> '{M0.彼}{F0.彼女}'。
 - タグと助詞の結合: 「{0.SimFirstName}は」「{M0.彼}{F0.彼女}の」など。
 - 二重助詞の防止: 「彼のの」→「彼の」に修正。
@@ -101,111 +28,213 @@
 必ず有効なJSON形式で返してください。キーは原文のまま、値のみを翻訳後の日本語にします。
 未翻訳の項目を絶対に作らないでください。`;
 
-    let sourceData = {};
-    let translatedData = {};
-    let keysToProcess = [];
-    let isRunning = false;
-    let stopRequested = false;
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [sourceData, setSourceData] = useState({});
+  const [translatedData, setTranslatedData] = useState({});
+  const [isRunning, setIsRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [logs, setLogs] = useState([{ msg: "待機中... 英語が残っているJSONを読み込んでもOKです。", type: "info" }]);
+  const stopRef = useRef(false);
 
-    const logEl = document.getElementById('log');
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const progressBar = document.getElementById('progressBar');
-    const percentText = document.getElementById('percentText');
+  // --- Helpers ---
+  const addLog = (msg, type = "info") => {
+    setLogs(prev => [{ msg, type, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
+  };
 
-    function log(msg, type = '') {
-        const div = document.createElement('div');
-        div.className = 'log-entry' + (type ? ' log-' + type : '');
-        div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        logEl.prepend(div);
+  const updateProgress = (done, total) => {
+    setProgress(Math.floor((done / total) * 100));
+  };
+
+  // --- File Handling ---
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    let combined = {};
+    for (const file of files) {
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        Object.assign(combined, json);
+      } catch (err) {
+        addLog(`${file.name} の読み込みに失敗しました。`, "error");
+      }
+    }
+    setSourceData(combined);
+    setTranslatedData({});
+    addLog(`${Object.keys(combined).length} 件のデータを読み込みました。`, "success");
+  };
+
+  // --- API Logic ---
+  const translateChunk = async (chunk) => {
+    let delay = 1000;
+    for (let i = 0; i < 5; i++) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: JSON.stringify(chunk) }] }],
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            generationConfig: { responseMimeType: "application/json" }
+          })
+        });
+
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        const result = await response.json();
+        const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        return JSON.parse(text);
+      } catch (err) {
+        if (i === 4) throw err;
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2;
+      }
+    }
+  };
+
+  const startTranslation = async () => {
+    setIsRunning(true);
+    stopRef.current = false;
+    addLog("翻訳プロセスを開始します。英語の残りを徹底的に日本語化します。");
+
+    const allKeys = Object.keys(sourceData);
+    const total = allKeys.length;
+    let currentTranslated = { ...translatedData };
+
+    for (let i = 0; i < total; i += CHUNK_SIZE) {
+      if (stopRef.current) {
+        addLog("一時停止しました。");
+        break;
+      }
+
+      const chunkKeys = allKeys.slice(i, i + CHUNK_SIZE);
+      const chunk = {};
+      chunkKeys.forEach(k => chunk[k] = sourceData[k]);
+
+      try {
+        const result = await translateChunk(chunk);
+        Object.assign(currentTranslated, result);
+        setTranslatedData({ ...currentTranslated });
+        updateProgress(Object.keys(currentTranslated).length, total);
+        addLog(`${Math.min(i + CHUNK_SIZE, total)} / ${total} 件完了`);
+      } catch (err) {
+        addLog(`エラー: ${err.message}`, "error");
+        break;
+      }
     }
 
-    document.getElementById('fileInput').addEventListener('change', async (e) => {
-        const files = Array.from(e.target.files);
-        if (files.length === 0) return;
-        sourceData = {}; 
-        for (const file of files) {
-            try {
-                const text = await file.text();
-                const json = JSON.parse(text);
-                Object.assign(sourceData, json);
-            } catch (err) { log(`${file.name} 読込失敗`, "err"); }
-        }
-        keysToProcess = Object.keys(sourceData);
-        translatedData = {}; 
-        updateStats();
-        log(`${keysToProcess.length} 件のデータを準備しました。`, 'ok');
-        startBtn.disabled = false;
-    });
+    setIsRunning(false);
+    addLog("すべての処理が完了しました。", "success");
+  };
 
-    function updateStats() {
-        const total = keysToProcess.length;
-        const done = Object.keys(translatedData).length;
-        document.getElementById('countTotal').textContent = total;
-        document.getElementById('countDone').textContent = done;
-        document.getElementById('countLeft').textContent = total - done;
-        const percent = Math.floor((done / total) * 100) || 0;
-        progressBar.style.width = percent + '%';
-        percentText.textContent = percent + '%';
-        downloadBtn.disabled = done === 0;
-    }
+  const downloadJson = () => {
+    const blob = new Blob([JSON.stringify(translatedData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `translated_fixed_${new Date().getTime()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-    async function translateChunk(chunk) {
-        const maxRetries = 5;
-        let delay = 1000;
-        for (let i = 0; i < maxRetries; i++) {
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: JSON.stringify(chunk) }] }],
-                        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-                        generationConfig: { responseMimeType: "application/json" }
-                    })
-                });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const result = await response.json();
-                return JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text);
-            } catch (err) {
-                if (i === maxRetries - 1) throw err;
-                await new Promise(r => setTimeout(r, delay));
-                delay *= 2;
-            }
-        }
-    }
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 font-sans">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <header className="text-center space-y-2">
+          <h1 className="text-3xl font-bold text-violet-400">Sims 4 プロ翻訳ツール v3.2</h1>
+          <p className="text-slate-400 text-sm">英語の残りを検出し、プロの文体で再翻訳します</p>
+        </header>
 
-    async function runTranslation() {
-        isRunning = true; stopRequested = false;
-        startBtn.disabled = true; stopBtn.disabled = false;
-        log("強化された指示で翻訳を開始します...");
-        const remainingKeys = keysToProcess.filter(k => !translatedData[k]);
-        for (let i = 0; i < remainingKeys.length; i += CHUNK_SIZE) {
-            if (stopRequested) break;
-            const currentKeys = remainingKeys.slice(i, i + CHUNK_SIZE);
-            const chunk = {};
-            currentKeys.forEach(k => chunk[k] = sourceData[k]);
-            try {
-                const translatedChunk = await translateChunk(chunk);
-                Object.assign(translatedData, translatedChunk);
-                updateStats();
-                log(`${Object.keys(translatedData).length} 件完了`);
-            } catch (err) { log(`エラー: ${err.message}`, 'err'); break; }
-        }
-        log("ジョブ終了", "ok");
-        isRunning = false; startBtn.disabled = false; stopBtn.disabled = true;
-    }
+        {/* Status Card */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+          <div className="flex flex-wrap gap-4 items-center">
+            <label className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg cursor-pointer transition">
+              <FileJson size={18} className="text-violet-400" />
+              <span>JSONを読込</span>
+              <input type="file" className="hidden" accept=".json" multiple onChange={handleFileUpload} />
+            </label>
 
-    startBtn.addEventListener('click', runTranslation);
-    stopBtn.addEventListener('click', () => { stopRequested = true; });
-    downloadBtn.addEventListener('click', () => {
-        const blob = new Blob([JSON.stringify(translatedData, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `translated_sims4_pro_${new Date().getTime()}.json`;
-        a.click();
-    });
-</script>
-</body>
-</html>
+            <button 
+              onClick={startTranslation}
+              disabled={isRunning || Object.keys(sourceData).length === 0}
+              className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 px-6 py-2 rounded-lg font-bold transition"
+            >
+              {isRunning ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
+              開始
+            </button>
+
+            <button 
+              onClick={() => stopRef.current = true}
+              disabled={!isRunning}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition"
+            >
+              <Pause size={18} />
+              停止
+            </button>
+
+            <div className="flex-grow min-w-[200px]">
+              <div className="flex justify-between text-xs mb-1 text-slate-400">
+                <span>進捗: {progress}%</span>
+                <span>{Object.keys(translatedData).length} / {Object.keys(sourceData).length}</span>
+              </div>
+              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-violet-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Results & Download */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col h-[400px]">
+            <div className="p-4 border-bottom border-slate-800 bg-slate-900/50 flex justify-between items-center">
+              <h3 className="font-bold flex items-center gap-2">
+                <ChevronRight size={18} className="text-violet-400" />
+                実行ログ
+              </h3>
+              <button 
+                onClick={downloadJson}
+                disabled={Object.keys(translatedData).length === 0}
+                className="flex items-center gap-2 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-3 py-1 rounded-md font-bold transition"
+              >
+                <Download size={14} />
+                保存
+              </button>
+            </div>
+            <div className="flex-grow overflow-y-auto p-4 space-y-2 font-monospace text-sm">
+              {logs.map((log, i) => (
+                <div key={i} className={`flex gap-2 ${log.type === 'error' ? 'text-rose-400' : log.type === 'success' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                  <span className="opacity-50">[{log.time}]</span>
+                  <span>{log.msg}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <h3 className="font-bold border-b border-slate-800 pb-2">翻訳ヒント</h3>
+            <ul className="text-xs space-y-3 text-slate-400">
+              <li className="flex gap-2">
+                <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                <span>英語が混じったJSONをそのまま読み込んで再実行できます。</span>
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                <span>「召喚する」「到着」などのシステム語も日本語化します。</span>
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                <span>タグの後の助詞（は、が、の等）を自然に繋げます。</span>
+              </li>
+              <li className="flex gap-2">
+                <AlertCircle size={14} className="text-amber-500 shrink-0" />
+                <span>保存ボタンは1件でも翻訳が完了すると有効になります。</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
